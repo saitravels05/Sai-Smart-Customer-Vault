@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { formatDateTime, maskIdentifier } from '@/lib/utils';
+import { DocumentVault } from '@/components/documents/document-vault';
 
 export default function CustomerProfilePage() {
   const params = useParams();
@@ -336,55 +337,11 @@ export default function CustomerProfilePage() {
       {/* Tab 3: Documents */}
       {activeTab === 'documents' && (
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
-              <FolderLock className="w-4 h-4 text-[#E85A18]" />
-              <span>Customer Document Vault</span>
-            </h3>
-            <Link
-              href={`/documents/upload?customerId=${customer.id}`}
-              className="inline-flex items-center gap-1.5 bg-[#E85A18] hover:bg-[#D44E0F] text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-xs"
-            >
-              <PlusCircle className="w-3.5 h-3.5" />
-              <span>Upload Document</span>
-            </Link>
-          </div>
-
-          {customer.documents?.length === 0 ? (
-            <p className="text-xs text-slate-400 py-6 text-center">
-              No documents stored in this customer vault yet.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-600 uppercase text-[10px] font-semibold border-b border-slate-100">
-                  <tr>
-                    <th className="py-2.5 px-3">Title</th>
-                    <th className="py-2.5 px-3">Category</th>
-                    <th className="py-2.5 px-3">Type</th>
-                    <th className="py-2.5 px-3">Scan Status</th>
-                    <th className="py-2.5 px-3">Date</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {customer.documents.map((doc: any) => (
-                    <tr key={doc.id}>
-                      <td className="py-2.5 px-3 font-semibold text-slate-800">{doc.title}</td>
-                      <td className="py-2.5 px-3 text-slate-600">{doc.category}</td>
-                      <td className="py-2.5 px-3 font-mono text-[11px] text-slate-700">{doc.type}</td>
-                      <td className="py-2.5 px-3">
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
-                          <CheckCircle2 className="w-3 h-3" />
-                          <span>CLEAN</span>
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-500">{formatDateTime(doc.createdAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <DocumentVault
+            customerId={customer.id}
+            customerName={customer.fullName}
+            onDocumentChange={loadCustomer}
+          />
         </div>
       )}
 
