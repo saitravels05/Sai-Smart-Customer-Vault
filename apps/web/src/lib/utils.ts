@@ -16,3 +16,15 @@ export function formatDateTime(isoString: string): string {
     minute: '2-digit',
   });
 }
+
+export function maskIdentifier(identifier: string, type: 'PASSPORT' | 'AADHAAR' | 'GENERIC' = 'GENERIC'): string {
+  if (!identifier) return '';
+  const clean = identifier.trim();
+  if (type === 'AADHAAR') {
+    return `XXXX-XXXX-${clean.slice(-4)}`;
+  }
+  if (clean.length <= 4) {
+    return '***' + clean.slice(-1);
+  }
+  return `${clean.slice(0, 2)}***${clean.slice(-2)}`;
+}
