@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils';
 import { DocumentCategory, DocumentType } from '@sai/shared-types';
+import { AiVerificationModal } from '@/components/ai/ai-verification-modal';
 
 interface DocumentVaultProps {
   customerId: string;
@@ -97,6 +98,7 @@ export function DocumentVault({
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [activeModalTab, setActiveModalTab] = useState<'preview' | 'versions' | 'audit'>('preview');
+  const [aiModalDoc, setAiModalDoc] = useState<any | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
@@ -595,13 +597,23 @@ export function DocumentVault({
 
                 {/* Card Action Buttons */}
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                  <button
-                    onClick={() => openPreview(doc)}
-                    className="inline-flex items-center gap-1 text-slate-600 hover:text-slate-900 font-semibold"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                    <span>Preview</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => openPreview(doc)}
+                      className="inline-flex items-center gap-1 text-slate-600 hover:text-slate-900 font-semibold"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Preview</span>
+                    </button>
+                    <button
+                      onClick={() => setAiModalDoc(doc)}
+                      className="inline-flex items-center gap-1 text-[#E85A18] hover:text-[#D44E0F] font-bold text-[11px] px-1.5 py-0.5 rounded bg-orange-50 hover:bg-orange-100 transition"
+                      title="AI Multimodal OCR & Field Extraction"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>AI Extract</span>
+                    </button>
+                  </div>
 
                   <div className="flex items-center gap-1">
                     <button
@@ -665,6 +677,13 @@ export function DocumentVault({
                       <td className="py-2.5 px-3 text-slate-500">{(doc.fileSizeBytes / 1024).toFixed(1)} KB</td>
                       <td className="py-2.5 px-3 text-slate-500">{formatDateTime(doc.createdAt)}</td>
                       <td className="py-2.5 px-3 text-right space-x-2">
+                        <button
+                          onClick={() => setAiModalDoc(doc)}
+                          className="text-[#E85A18] hover:text-[#D44E0F] font-bold inline-flex items-center gap-1 bg-orange-50 hover:bg-orange-100 px-2 py-0.5 rounded text-[11px]"
+                          title="AI OCR & Extraction"
+                        >
+                          <Sparkles className="w-3 h-3" /> AI Extract
+                        </button>
                         <button
                           onClick={() => openPreview(doc)}
                           className="text-slate-600 hover:text-slate-900 font-semibold inline-flex items-center gap-1"
@@ -946,6 +965,21 @@ export function DocumentVault({
             </div>
           </div>
         </div>
+      )}
+
+      {/* AI Human-in-the-Loop Verification Modal */}
+      {aiModalDoc && (
+        <AiVerificationModal
+          documentId={aiModalDoc.id}
+          documentTitle={aiModalDoc.title}
+          documentType={aiModalDoc.type}
+          customerId={customerId}
+          onClose={() => setAiModalDoc(null)}
+          onVerifiedSuccess={() => {
+            loadDocuments();
+            if (onDocumentChange) onDocumentChange();
+          }}
+        />
       )}
     </div>
   );
