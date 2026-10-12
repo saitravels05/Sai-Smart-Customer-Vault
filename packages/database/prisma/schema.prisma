@@ -1,0 +1,542 @@
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  BRANCH_MANAGER
+  STAFF
+  READ_ONLY
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  UNSPECIFIED
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum ServiceCategory {
+  PASSPORT_SERVICES
+  TOURIST_VISA
+  BUSINESS_VISA
+  FLIGHT_BOOKING
+  HOTEL_BOOKING
+  TOUR_PACKAGES
+  CERTIFICATE_ATTESTATION
+  GAZETTE_SERVICES
+  TRANSPORT_RENTALS
+  OTHER_TRAVEL_SERVICES
+}
+
+enum DocumentCategory {
+  IDENTITY_DOCUMENT
+  TRAVEL_DOCUMENT
+  BUSINESS_DOCUMENT
+  APPLICATION_DOCUMENT
+  ATTESTATION_DOCUMENT
+}
+
+enum DocumentType {
+  PASSPORT
+  AADHAAR_MASKED
+  PAN_CARD
+  VOTER_ID
+  DRIVING_LICENCE
+  BIRTH_CERTIFICATE
+  MARRIAGE_CERTIFICATE
+  FLIGHT_TICKET
+  E_TICKET
+  BOARDING_PASS
+  VISA_COPY
+  VISA_APPROVAL_LETTER
+  TRAVEL_INSURANCE
+  HOTEL_BOOKING_CONFIRMATION
+  TOUR_ITINERARY
+  IMMIGRATION_DOCUMENT
+  INVOICE
+  PAYMENT_RECEIPT
+  CUSTOMER_APPLICATION
+  EMPLOYER_NOC_LETTER
+  BUSINESS_INVITATION_LETTER
+  UNDERTAKING_LETTER
+  ATTESTATION_CERTIFICATE
+  OTHER
+}
+
+enum AIJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  VERIFIED
+  REJECTED
+  FAILED
+}
+
+enum ReminderType {
+  PASSPORT_EXPIRY
+  VISA_EXPIRY
+  TRAVEL_INSURANCE_EXPIRY
+  UPCOMING_FLIGHT_DEPARTURE
+  HOTEL_CHECKIN
+  DOCUMENT_RENEWAL
+  VISA_APPLICATION_FOLLOWUP
+}
+
+enum ReminderChannel {
+  DASHBOARD
+  EMAIL
+  WHATSAPP
+}
+
+enum ReminderStatus {
+  SCHEDULED
+  SENT
+  ACKNOWLEDGED
+  DISMISSED
+  FAILED
+}
+
+// ----------------------------------------------------
+// Organization & Staffing
+// ----------------------------------------------------
+
+model Branch {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code         String         @unique @db.VarChar(10)
+  name         String         @db.VarChar(100)
+  address      String         @db.Text
+  city         String         @db.VarChar(50)
+  state        String         @default("Tamil Nadu") @db.VarChar(50)
+  country      String         @default("India") @db.VarChar(50)
+  phone        String         @db.VarChar(20)
+  email        String         @db.VarChar(100)
+  isHeadOffice Boolean        @default(false)
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime       @updatedAt @db.Timestamptz(6)
+
+  staff        StaffProfile[]
+  customers    Customer[]
+  auditLogs    AuditLog[]
+
+  @@map("branches")
+}
+
+model User {
+  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email              String              @unique @db.VarChar(150)
+  passwordHash       String              @db.VarChar(255)
+  role               UserRole            @default(STAFF)
+  mfaSecret          String?             @db.VarChar(255)
+  isMfaEnabled       Boolean             @default(false)
+  isActive           Boolean             @default(true)
+  lastLoginAt        DateTime?           @db.Timestamptz(6)
+  currentSessionId   String?             @db.VarChar(255)
+  failedAttempts     Int                 @default(0)
+  lockedUntil        DateTime?           @db.Timestamptz(6)
+  createdAt          DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime            @updatedAt @db.Timestamptz(6)
+
+  staffProfile       StaffProfile?
+  auditLogs          AuditLog[]
+  documentAccessLogs DocumentAccessLog[]
+  verifiedAiResults  AIExtractionResult[] @relation("VerifiedByUser")
+
+  @@map("users")
+}
+
+model StaffProfile {
+  id            String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String     @unique @db.Uuid
+  branchId      String     @db.Uuid
+  staffCode     String     @unique @db.VarChar(20)
+  fullName      String     @db.VarChar(120)
+  designation   String     @db.VarChar(80)
+  contactNumber String     @db.VarChar(20)
+  createdAt     DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime   @updatedAt @db.Timestamptz(6)
+
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch        Branch     @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  assignedCustomers Customer[] @relation("AssignedStaff")
+
+  @@map("staff_profiles")
+}
+
+// ----------------------------------------------------
+// Customer Management
+// ----------------------------------------------------
+
+model Customer {
+  id              String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerNumber  String             @unique @db.VarChar(25)
+  branchId        String             @db.Uuid
+  assignedStaffId String?            @db.Uuid
+
+  fullName        String             @db.VarChar(150)
+  dateOfBirth     DateTime?          @db.Date
+  gender          Gender             @default(UNSPECIFIED)
+  nationality     String             @default("Indian") @db.VarChar(60)
+
+  primaryPhone    String             @db.VarChar(20)
+  whatsappNumber  String?            @db.VarChar(20)
+  email           String?            @db.VarChar(120)
+
+  addressLine     String?            @db.Text
+  city            String?            @db.VarChar(60)
+  state           String?            @default("Tamil Nadu") @db.VarChar(60)
+  postalCode      String?            @db.VarChar(15)
+  country         String?            @default("India") @db.VarChar(60)
+
+  primaryCategory ServiceCategory    @default(PASSPORT_SERVICES)
+  status          CustomerStatus     @default(ACTIVE)
+  notes           String?            @db.Text
+
+  registeredAt    DateTime           @default(now()) @db.Timestamptz(6)
+  archivedAt      DateTime?          @db.Timestamptz(6)
+  isDeleted       Boolean            @default(false)
+  createdAt       DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime           @updatedAt @db.Timestamptz(6)
+
+  branch          Branch             @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  assignedStaff   StaffProfile?      @relation("AssignedStaff", fields: [assignedStaffId], references: [id], onDelete: SetNull)
+  contacts        CustomerContact[]
+  services        CustomerService[]
+  passports       Passport[]
+  visas           Visa[]
+  bookings        TravelBooking[]
+  documents       Document[]
+  reminders       Reminder[]
+  consents        CustomerConsent[]
+  relationshipsFrom CustomerRelationship[] @relation("RelSubject")
+  relationshipsTo   CustomerRelationship[] @relation("RelRelative")
+
+  @@index([branchId])
+  @@index([primaryPhone])
+  @@index([fullName])
+  @@index([status])
+  @@index([registeredAt])
+  @@map("customers")
+}
+
+model CustomerContact {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerId   String   @db.Uuid
+  contactType  String   @db.VarChar(30)
+  contactValue String   @db.VarChar(100)
+  isPrimary    Boolean  @default(false)
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@map("customer_contacts")
+}
+
+model CustomerRelationship {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerId   String   @db.Uuid
+  relativeId   String   @db.Uuid
+  relationship String   @db.VarChar(40)
+  groupName    String?  @db.VarChar(80)
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+
+  customer     Customer @relation("RelSubject", fields: [customerId], references: [id], onDelete: Cascade)
+  relative     Customer @relation("RelRelative", fields: [relativeId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, relativeId, relationship])
+  @@map("customer_relationships")
+}
+
+model CustomerService {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerId      String          @db.Uuid
+  serviceCategory ServiceCategory
+  serviceName     String          @db.VarChar(150)
+  serviceDate     DateTime        @default(now()) @db.Date
+  status          String          @default("IN_PROGRESS") @db.VarChar(30)
+  remarks         String?         @db.Text
+  createdAt       DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime        @updatedAt @db.Timestamptz(6)
+
+  customer        Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, serviceCategory])
+  @@map("customer_services")
+}
+
+// ----------------------------------------------------
+// Travel Credentials & Bookings
+// ----------------------------------------------------
+
+model Passport {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerId         String    @db.Uuid
+  passportNumberEnc  String    @db.VarChar(255)
+  passportNumberMask String    @db.VarChar(20)
+  passportHash       String    @unique @db.VarChar(64)
+  issuingCountry     String    @default("IND") @db.VarChar(10)
+  issueDate          DateTime? @db.Date
+  expiryDate         DateTime  @db.Date
+  placeOfIssue       String?   @db.VarChar(80)
+  mrzRawLine1        String?   @db.VarChar(60)
+  mrzRawLine2        String?   @db.VarChar(60)
+  isCurrent          Boolean   @default(true)
+  createdAt          DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime  @updatedAt @db.Timestamptz(6)
+
+  customer           Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([expiryDate])
+  @@index([customerId])
+  @@map("passports")
+}
+
+model Visa {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerId         String    @db.Uuid
+  country            String    @db.VarChar(60)
+  visaNumberEnc      String?   @db.VarChar(255)
+  visaCategory       String    @db.VarChar(50)
+  issueDate          DateTime? @db.Date
+  expiryDate         DateTime  @db.Date
+  durationOfStayDays Int?
+  entriesPermitted   String    @default("SINGLE") @db.VarChar(20)
+  status             String    @default("ACTIVE") @db.VarChar(30)
+  createdAt          DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime  @updatedAt @db.Timestamptz(6)
+
+  customer           Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([expiryDate])
+  @@index([customerId])
+  @@map("visas")
+}
+
+model TravelBooking {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerId    String    @db.Uuid
+  bookingRef    String    @db.VarChar(40)
+  pnr           String?   @db.VarChar(20)
+  airline       String?   @db.VarChar(80)
+  flightNumber  String?   @db.VarChar(30)
+  originAirport String?   @db.VarChar(10)
+  destAirport   String?   @db.VarChar(10)
+  departureTime DateTime? @db.Timestamptz(6)
+  arrivalTime   DateTime? @db.Timestamptz(6)
+  hotelName     String?   @db.VarChar(150)
+  checkInDate   DateTime? @db.Date
+  checkOutDate  DateTime? @db.Date
+  createdAt     DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(6)
+
+  customer      Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([departureTime])
+  @@index([customerId])
+  @@map("travel_bookings")
+}
+
+// ----------------------------------------------------
+// Secure Document Vault
+// ----------------------------------------------------
+
+model Document {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerId        String              @db.Uuid
+  branchId          String              @db.Uuid
+  category          DocumentCategory
+  type              DocumentType
+  title             String              @db.VarChar(200)
+  description       String?             @db.Text
+  tags              String[]            @default([])
+
+  storageKey        String              @unique @db.VarChar(255)
+  bucketName        String              @db.VarChar(100)
+  fileSizeBytes     BigInt
+  mimeType          String              @db.VarChar(100)
+  sha256Checksum    String              @db.VarChar(64)
+  isEncryptedAtRest Boolean             @default(true)
+
+  isMalwareClean    Boolean             @default(false)
+  scanCompletedAt   DateTime?           @db.Timestamptz(6)
+  isArchived        Boolean             @default(false)
+  isDeleted         Boolean             @default(false)
+
+  currentVersion    Int                 @default(1)
+
+  createdAt         DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime            @updatedAt @db.Timestamptz(6)
+
+  customer          Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  versions          DocumentVersion[]
+  accessLogs        DocumentAccessLog[]
+  aiJobs            AIProcessingJob[]
+
+  @@index([customerId])
+  @@index([type])
+  @@index([category])
+  @@index([createdAt])
+  @@map("documents")
+}
+
+model DocumentVersion {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  documentId     String   @db.Uuid
+  versionNumber  Int
+  storageKey     String   @db.VarChar(255)
+  fileSizeBytes  BigInt
+  sha256Checksum String   @db.VarChar(64)
+  uploadedById   String   @db.Uuid
+  reason         String?  @db.VarChar(255)
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+
+  document       Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, versionNumber])
+  @@map("document_versions")
+}
+
+model DocumentAccessLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  documentId String   @db.Uuid
+  userId     String   @db.Uuid
+  action     String   @db.VarChar(30)
+  ipAddress  String   @db.VarChar(45)
+  userAgent  String?  @db.Text
+  accessedAt DateTime @default(now()) @db.Timestamptz(6)
+
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([documentId])
+  @@index([userId])
+  @@index([accessedAt])
+  @@map("document_access_logs")
+}
+
+// ----------------------------------------------------
+// AI Engine & Processing Pipeline
+// ----------------------------------------------------
+
+model AIProcessingJob {
+  id               String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  documentId       String              @db.Uuid
+  jobType          String              @db.VarChar(50)
+  status           AIJobStatus         @default(PENDING)
+  modelName        String              @db.VarChar(80)
+  rawTextExtracted String?             @db.Text
+  confidenceScore  Decimal?            @db.Decimal(5, 2)
+  errorMessage     String?             @db.Text
+  startedAt        DateTime?           @db.Timestamptz(6)
+  completedAt      DateTime?           @db.Timestamptz(6)
+  createdAt        DateTime            @default(now()) @db.Timestamptz(6)
+
+  document         Document            @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  extractionResult AIExtractionResult?
+
+  @@index([documentId])
+  @@index([status])
+  @@map("ai_processing_jobs")
+}
+
+model AIExtractionResult {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobId             String          @unique @db.Uuid
+  extractedJson     Json
+  verifiedJson      Json?
+  isVerified        Boolean         @default(false)
+  verifiedById      String?         @db.Uuid
+  verifiedAt        DateTime?       @db.Timestamptz(6)
+  appliedToCustomer Boolean         @default(false)
+  createdAt         DateTime        @default(now()) @db.Timestamptz(6)
+
+  job               AIProcessingJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  verifiedBy        User?           @relation("VerifiedByUser", fields: [verifiedById], references: [id], onDelete: SetNull)
+
+  @@map("ai_extraction_results")
+}
+
+// ----------------------------------------------------
+// Automated Reminders & Alerts
+// ----------------------------------------------------
+
+model Reminder {
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerId     String          @db.Uuid
+  type           ReminderType
+  channel        ReminderChannel @default(DASHBOARD)
+  title          String          @db.VarChar(200)
+  message        String          @db.Text
+  targetDate     DateTime        @db.Date
+  leadDays       Int
+  scheduledFor   DateTime        @db.Timestamptz(6)
+  status         ReminderStatus  @default(SCHEDULED)
+  sentAt         DateTime?       @db.Timestamptz(6)
+  acknowledgedAt DateTime?       @db.Timestamptz(6)
+  failureReason  String?         @db.Text
+  createdAt      DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime        @updatedAt @db.Timestamptz(6)
+
+  customer       Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([scheduledFor, status])
+  @@index([customerId])
+  @@map("reminders")
+}
+
+// ----------------------------------------------------
+// Governance, Audit & DPDPA Consent
+// ----------------------------------------------------
+
+model CustomerConsent {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerId    String    @db.Uuid
+  purpose       String    @db.VarChar(120)
+  isGranted     Boolean   @default(true)
+  noticeVersion String    @db.VarChar(20)
+  ipAddress     String?   @db.VarChar(45)
+  recordedById  String    @db.Uuid
+  recordedAt    DateTime  @default(now()) @db.Timestamptz(6)
+  revokedAt     DateTime? @db.Timestamptz(6)
+
+  customer      Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@map("customer_consents")
+}
+
+model AuditLog {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String?  @db.Uuid
+  branchId     String?  @db.Uuid
+  action       String   @db.VarChar(80)
+  entityType   String   @db.VarChar(50)
+  entityId     String   @db.VarChar(100)
+  oldStateJson Json?
+  newStateJson Json?
+  ipAddress    String   @db.VarChar(45)
+  userAgent    String?  @db.Text
+  timestamp    DateTime @default(now()) @db.Timestamptz(6)
+
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  branch       Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([timestamp])
+  @@index([userId])
+  @@map("audit_logs")
+}

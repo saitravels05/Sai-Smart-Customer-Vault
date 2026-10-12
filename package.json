@@ -1,0 +1,19 @@
+{
+  "name": "sai-smart-customer-vault-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "clean": "turbo run clean",
+    "db:generate": "pnpm --filter @sai/database db:generate"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.4",
+    "typescript": "^5.4.5"
+  },
+  "packageManager": "pnpm@12.10.1"
+}
