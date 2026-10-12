@@ -58,3 +58,66 @@ export interface CustomerSummaryDto {
   registeredAt: string;
   documentCount: number;
 }
+
+export const addPassportSchema = z.object({
+  passportNumber: z.string().min(5).max(20),
+  issuingCountry: z.string().default('IND'),
+  issueDate: z.string().optional().nullable(),
+  expiryDate: z.string().min(4),
+  placeOfIssue: z.string().optional().nullable(),
+});
+
+export type AddPassportDto = z.infer<typeof addPassportSchema>;
+
+export const addVisaSchema = z.object({
+  country: z.string().min(2).max(80),
+  visaNumber: z.string().optional().nullable(),
+  visaCategory: z.string().default('TOURIST'),
+  issueDate: z.string().optional().nullable(),
+  expiryDate: z.string().min(4),
+  durationOfStayDays: z.coerce.number().optional().nullable(),
+  entriesPermitted: z.string().default('SINGLE'),
+});
+
+export type AddVisaDto = z.infer<typeof addVisaSchema>;
+
+export const addBookingSchema = z.object({
+  bookingRef: z.string().min(2).max(50),
+  pnr: z.string().optional().nullable(),
+  airline: z.string().optional().nullable(),
+  flightNumber: z.string().optional().nullable(),
+  originAirport: z.string().optional().nullable(),
+  destAirport: z.string().optional().nullable(),
+  departureTime: z.string().optional().nullable(),
+  arrivalTime: z.string().optional().nullable(),
+  hotelName: z.string().optional().nullable(),
+  checkInDate: z.string().optional().nullable(),
+  checkOutDate: z.string().optional().nullable(),
+});
+
+export type AddBookingDto = z.infer<typeof addBookingSchema>;
+
+export const addNoteSchema = z.object({
+  content: z.string().min(1).max(2000),
+  category: z.string().default('GENERAL'),
+});
+
+export type AddNoteDto = z.infer<typeof addNoteSchema>;
+
+export interface DuplicateCandidateDto {
+  id: string;
+  customerNumber: string;
+  fullName: string;
+  primaryPhone: string;
+  whatsappNumber?: string | null;
+  matchScore: number; // 0 - 100%
+  matchReason: string;
+}
+
+export const mergeCustomersSchema = z.object({
+  duplicateCustomerId: z.string().uuid(),
+  resolutionReason: z.string().min(3).max(500),
+});
+
+export type MergeCustomersDto = z.infer<typeof mergeCustomersSchema>;
+

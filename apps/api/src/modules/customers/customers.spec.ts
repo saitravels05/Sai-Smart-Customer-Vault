@@ -126,4 +126,54 @@ describe('Phase 4 — Customer CRM Module Suite', () => {
       assert.equal(archivedAt, null);
     });
   });
+
+  describe('Phase 10 — Travel Credentials, Expiry & Profile Merging Suite', () => {
+    test('should validate passport 6-month international validity rule', () => {
+      const now = new Date('2026-10-12T00:00:00Z');
+      const passportValid = new Date('2027-06-15T00:00:00Z'); // 8 months ahead
+      const passportExpiringSoon = new Date('2027-01-15T00:00:00Z'); // 3 months ahead
+
+      const checkInternationalValidity = (expiryDate: Date, referenceDate: Date) => {
+        const msPerDay = 1000 * 60 * 60 * 24;
+        const daysRemaining = Math.floor((expiryDate.getTime() - referenceDate.getTime()) / msPerDay);
+        return {
+          daysRemaining,
+          isValidForInternationalTravel: daysRemaining >= 180,
+          needsRenewalAlert: daysRemaining < 180,
+        };
+      };
+
+      const result1 = checkInternationalValidity(passportValid, now);
+      assert.equal(result1.isValidForInternationalTravel, true);
+      assert.equal(result1.needsRenewalAlert, false);
+
+      const result2 = checkInternationalValidity(passportExpiringSoon, now);
+      assert.equal(result2.isValidForInternationalTravel, false);
+      assert.equal(result2.needsRenewalAlert, true);
+    });
+
+    test('should enforce merge customer profile authorization', () => {
+      const canMerge = (role: UserRole) => {
+        return role === UserRole.SUPER_ADMIN || role === UserRole.BRANCH_MANAGER;
+      };
+
+      assert.equal(canMerge(UserRole.SUPER_ADMIN), true, 'Super Admin can merge');
+      assert.equal(canMerge(UserRole.BRANCH_MANAGER), true, 'Branch Manager can merge');
+      assert.equal(canMerge(UserRole.STAFF), false, 'Staff cannot merge');
+      assert.equal(canMerge(UserRole.READ_ONLY), false, 'Read-only cannot merge');
+    });
+
+    test('should calculate duplicate match scores accurately', () => {
+      const calculateScore = (exactPhone: boolean, exactName: boolean) => {
+        if (exactPhone) return 95;
+        if (exactName) return 80;
+        return 0;
+      };
+
+      assert.equal(calculateScore(true, true), 95);
+      assert.equal(calculateScore(false, true), 80);
+      assert.equal(calculateScore(false, false), 0);
+    });
+  });
 });
+

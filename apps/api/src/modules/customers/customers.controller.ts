@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Query,
   Body,
@@ -27,6 +28,16 @@ import {
   CustomerFilterDto,
   customerFilterSchema,
   UserRole,
+  AddPassportDto,
+  addPassportSchema,
+  AddVisaDto,
+  addVisaSchema,
+  AddBookingDto,
+  addBookingSchema,
+  AddNoteDto,
+  addNoteSchema,
+  MergeCustomersDto,
+  mergeCustomersSchema,
 } from '@sai/shared-types';
 
 @ApiTags('Customers')
@@ -191,4 +202,162 @@ export class CustomersController {
       data: rel,
     };
   }
+
+  @Delete(':id/relationships/:relId')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.BRANCH_MANAGER, UserRole.STAFF)
+  @ApiOperation({ summary: 'Remove relationship link' })
+  async deleteRelationship(
+    @Param('id') customerId: string,
+    @Param('relId') relId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const res = await this.customersService.deleteRelationship(customerId, relId, user);
+    return {
+      success: true,
+      message: 'Relationship removed successfully',
+      data: res,
+    };
+  }
+
+  @Post(':id/passports')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.BRANCH_MANAGER, UserRole.STAFF)
+  @ApiOperation({ summary: 'Add passport to customer profile' })
+  async addPassport(
+    @Param('id') customerId: string,
+    @Body(new ZodValidationPipe(addPassportSchema)) dto: AddPassportDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const passport = await this.customersService.addPassport(customerId, dto, user);
+    return {
+      success: true,
+      message: 'Passport added successfully',
+      data: passport,
+    };
+  }
+
+  @Delete(':id/passports/:passportId')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.BRANCH_MANAGER, UserRole.STAFF)
+  @ApiOperation({ summary: 'Delete passport from customer profile' })
+  async deletePassport(
+    @Param('id') customerId: string,
+    @Param('passportId') passportId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const res = await this.customersService.deletePassport(customerId, passportId, user);
+    return {
+      success: true,
+      message: 'Passport removed successfully',
+      data: res,
+    };
+  }
+
+  @Post(':id/visas')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.BRANCH_MANAGER, UserRole.STAFF)
+  @ApiOperation({ summary: 'Add visa to customer profile' })
+  async addVisa(
+    @Param('id') customerId: string,
+    @Body(new ZodValidationPipe(addVisaSchema)) dto: AddVisaDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const visa = await this.customersService.addVisa(customerId, dto, user);
+    return {
+      success: true,
+      message: 'Visa added successfully',
+      data: visa,
+    };
+  }
+
+  @Delete(':id/visas/:visaId')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.BRANCH_MANAGER, UserRole.STAFF)
+  @ApiOperation({ summary: 'Delete visa from customer profile' })
+  async deleteVisa(
+    @Param('id') customerId: string,
+    @Param('visaId') visaId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const res = await this.customersService.deleteVisa(customerId, visaId, user);
+    return {
+      success: true,
+      message: 'Visa removed successfully',
+      data: res,
+    };
+  }
+
+  @Post(':id/bookings')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.BRANCH_MANAGER, UserRole.STAFF)
+  @ApiOperation({ summary: 'Add travel booking (flight/hotel) to customer' })
+  async addBooking(
+    @Param('id') customerId: string,
+    @Body(new ZodValidationPipe(addBookingSchema)) dto: AddBookingDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const booking = await this.customersService.addBooking(customerId, dto, user);
+    return {
+      success: true,
+      message: 'Travel booking added successfully',
+      data: booking,
+    };
+  }
+
+  @Delete(':id/bookings/:bookingId')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.BRANCH_MANAGER, UserRole.STAFF)
+  @ApiOperation({ summary: 'Delete travel booking' })
+  async deleteBooking(
+    @Param('id') customerId: string,
+    @Param('bookingId') bookingId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const res = await this.customersService.deleteBooking(customerId, bookingId, user);
+    return {
+      success: true,
+      message: 'Booking removed successfully',
+      data: res,
+    };
+  }
+
+  @Post(':id/notes')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.BRANCH_MANAGER, UserRole.STAFF)
+  @ApiOperation({ summary: 'Add staff note to customer record' })
+  async addNote(
+    @Param('id') customerId: string,
+    @Body(new ZodValidationPipe(addNoteSchema)) dto: AddNoteDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const res = await this.customersService.addCustomerNote(customerId, dto, user);
+    return {
+      success: true,
+      message: 'Staff note added successfully',
+      data: res,
+    };
+  }
+
+  @Get(':id/duplicates')
+  @ApiOperation({ summary: 'Find potential duplicate customer profiles' })
+  async getDuplicates(
+    @Param('id') customerId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const duplicates = await this.customersService.getDuplicates(customerId, user);
+    return {
+      success: true,
+      data: duplicates,
+    };
+  }
+
+  @Post(':id/merge')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.BRANCH_MANAGER)
+  @ApiOperation({ summary: 'Merge duplicate customer into target profile' })
+  async mergeCustomer(
+    @Param('id') targetCustomerId: string,
+    @Body(new ZodValidationPipe(mergeCustomersSchema)) dto: MergeCustomersDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const res = await this.customersService.mergeCustomers(targetCustomerId, dto, user);
+    return {
+      success: true,
+      message: res.message,
+      data: res,
+    };
+  }
 }
+

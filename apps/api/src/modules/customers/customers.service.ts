@@ -6,13 +6,19 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
-import { prisma } from '@sai/database';
+import { prisma, encryptField, hashField, maskIdentifier } from '@sai/database';
 import {
   CreateCustomerDto,
   UpdateCustomerDto,
   CustomerFilterDto,
   CustomerStatus,
   UserRole,
+  AddPassportDto,
+  AddVisaDto,
+  AddBookingDto,
+  AddNoteDto,
+  DuplicateCandidateDto,
+  MergeCustomersDto,
 } from '@sai/shared-types';
 import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 
@@ -574,4 +580,393 @@ export class CustomersService {
       timeline,
     };
   }
+
+  /**
+   * Add passport record with AES-256-GCM encryption and SHA-256 lookup hash
+   */
+  async addPassport(customerId: string, dto: AddPassportDto, user: AuthenticatedUser) {
+    const customer = await this.getCustomerById(customerId, user);
+    const cleanNumber = dto.passportNumber.trim().toUpperCase();
+    const passportEnc = encryptField(cleanNumber);
+    const passportMask = maskIdentifier(cleanNumber);
+    const passportHash = hashField(cleanNumber);
+
+    const expiry = new Date(dto.expiryDate);
+    const issue = dto.issueDate ? new Date(dto.issueDate) : null;
+
+    const passport = await prisma.passport.create({
+      data: {
+        customerId,
+        passportNumberEnc: passportEnc,
+        passportNumberMask: passportMask,
+        passportHash,
+        issuingCountry: dto.issuingCountry || 'IND',
+        issueDate: issue,
+        expiryDate: expiry,
+        placeOfIssue: dto.placeOfIssue,
+        isCurrent: true,
+      },
+    });
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          userId: user.userId,
+          branchId: customer.branchId,
+          action: 'CUSTOMER_PASSPORT_ADDED',
+          entityType: 'PASSPORT',
+          entityId: passport.id,
+          newStateJson: { customerId, passportMask, expiryDate: dto.expiryDate },
+        },
+      });
+    } catch {}
+
+    return passport;
+  }
+
+  /**
+   * Delete or archive a passport record
+   */
+  async deletePassport(customerId: string, passportId: string, user: AuthenticatedUser) {
+    const customer = await this.getCustomerById(customerId, user);
+    await prisma.passport.delete({
+      where: { id: passportId, customerId },
+    });
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          userId: user.userId,
+          branchId: customer.branchId,
+          action: 'CUSTOMER_PASSPORT_DELETED',
+          entityType: 'PASSPORT',
+          entityId: passportId,
+        },
+      });
+    } catch {}
+
+    return { success: true };
+  }
+
+  /**
+   * Add Visa credential to customer profile
+   */
+  async addVisa(customerId: string, dto: AddVisaDto, user: AuthenticatedUser) {
+    const customer = await this.getCustomerById(customerId, user);
+    const expiry = new Date(dto.expiryDate);
+    const issue = dto.issueDate ? new Date(dto.issueDate) : null;
+    const visaEnc = dto.visaNumber ? encryptField(dto.visaNumber.trim().toUpperCase()) : null;
+
+    const visa = await prisma.visa.create({
+      data: {
+        customerId,
+        country: dto.country,
+        visaNumberEnc: visaEnc,
+        visaCategory: dto.visaCategory,
+        issueDate: issue,
+        expiryDate: expiry,
+        durationOfStayDays: dto.durationOfStayDays,
+        entriesPermitted: dto.entriesPermitted || 'SINGLE',
+        status: 'ACTIVE',
+      },
+    });
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          userId: user.userId,
+          branchId: customer.branchId,
+          action: 'CUSTOMER_VISA_ADDED',
+          entityType: 'VISA',
+          entityId: visa.id,
+          newStateJson: { country: dto.country, visaCategory: dto.visaCategory, expiryDate: dto.expiryDate },
+        },
+      });
+    } catch {}
+
+    return visa;
+  }
+
+  /**
+   * Delete Visa record
+   */
+  async deleteVisa(customerId: string, visaId: string, user: AuthenticatedUser) {
+    const customer = await this.getCustomerById(customerId, user);
+    await prisma.visa.delete({
+      where: { id: visaId, customerId },
+    });
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          userId: user.userId,
+          branchId: customer.branchId,
+          action: 'CUSTOMER_VISA_DELETED',
+          entityType: 'VISA',
+          entityId: visaId,
+        },
+      });
+    } catch {}
+
+    return { success: true };
+  }
+
+  /**
+   * Add flight or hotel travel booking record
+   */
+  async addBooking(customerId: string, dto: AddBookingDto, user: AuthenticatedUser) {
+    const customer = await this.getCustomerById(customerId, user);
+    const depTime = dto.departureTime ? new Date(dto.departureTime) : null;
+    const arrTime = dto.arrivalTime ? new Date(dto.arrivalTime) : null;
+    const chkIn = dto.checkInDate ? new Date(dto.checkInDate) : null;
+    const chkOut = dto.checkOutDate ? new Date(dto.checkOutDate) : null;
+
+    const booking = await prisma.travelBooking.create({
+      data: {
+        customerId,
+        bookingRef: dto.bookingRef,
+        pnr: dto.pnr?.toUpperCase(),
+        airline: dto.airline,
+        flightNumber: dto.flightNumber?.toUpperCase(),
+        originAirport: dto.originAirport?.toUpperCase(),
+        destAirport: dto.destAirport?.toUpperCase(),
+        departureTime: depTime,
+        arrivalTime: arrTime,
+        hotelName: dto.hotelName,
+        checkInDate: chkIn,
+        checkOutDate: chkOut,
+      },
+    });
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          userId: user.userId,
+          branchId: customer.branchId,
+          action: 'CUSTOMER_BOOKING_ADDED',
+          entityType: 'TRAVEL_BOOKING',
+          entityId: booking.id,
+          newStateJson: { bookingRef: dto.bookingRef, pnr: dto.pnr },
+        },
+      });
+    } catch {}
+
+    return booking;
+  }
+
+  /**
+   * Delete travel booking
+   */
+  async deleteBooking(customerId: string, bookingId: string, user: AuthenticatedUser) {
+    const customer = await this.getCustomerById(customerId, user);
+    await prisma.travelBooking.delete({
+      where: { id: bookingId, customerId },
+    });
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          userId: user.userId,
+          branchId: customer.branchId,
+          action: 'CUSTOMER_BOOKING_DELETED',
+          entityType: 'TRAVEL_BOOKING',
+          entityId: bookingId,
+        },
+      });
+    } catch {}
+
+    return { success: true };
+  }
+
+  /**
+   * Add formatted staff note to customer record
+   */
+  async addCustomerNote(customerId: string, dto: AddNoteDto, user: AuthenticatedUser) {
+    const customer = await this.getCustomerById(customerId, user);
+    const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 16);
+    const authorTag = user.name || user.email;
+    const newNoteLine = `[${timestamp} | ${authorTag} (${dto.category})]: ${dto.content.trim()}`;
+
+    const updatedNotes = customer.notes ? `${customer.notes}\n\n${newNoteLine}` : newNoteLine;
+
+    const updated = await prisma.customer.update({
+      where: { id: customerId },
+      data: { notes: updatedNotes },
+    });
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          userId: user.userId,
+          branchId: customer.branchId,
+          action: 'CUSTOMER_NOTE_ADDED',
+          entityType: 'CUSTOMER',
+          entityId: customerId,
+          newStateJson: { category: dto.category },
+        },
+      });
+    } catch {}
+
+    return { success: true, notes: updated.notes };
+  }
+
+  /**
+   * Scan for duplicate customer profiles using phone, WhatsApp, and name matching
+   */
+  async getDuplicates(customerId: string, user: AuthenticatedUser): Promise<DuplicateCandidateDto[]> {
+    const target = await this.getCustomerById(customerId, user);
+    const candidates: DuplicateCandidateDto[] = [];
+
+    // Find candidates by primary phone or WhatsApp
+    const phoneMatches = await prisma.customer.findMany({
+      where: {
+        id: { not: customerId },
+        isDeleted: false,
+        OR: [
+          { primaryPhone: target.primaryPhone },
+          ...(target.whatsappNumber ? [{ whatsappNumber: target.whatsappNumber }, { primaryPhone: target.whatsappNumber }] : []),
+        ],
+      },
+    });
+
+    for (const m of phoneMatches) {
+      candidates.push({
+        id: m.id,
+        customerNumber: m.customerNumber,
+        fullName: m.fullName,
+        primaryPhone: m.primaryPhone,
+        whatsappNumber: m.whatsappNumber,
+        matchScore: 95,
+        matchReason: 'Exact mobile number match',
+      });
+    }
+
+    // Name matching
+    const nameMatches = await prisma.customer.findMany({
+      where: {
+        id: { not: customerId, notIn: candidates.map((c) => c.id) },
+        isDeleted: false,
+        fullName: { equals: target.fullName, mode: 'insensitive' },
+      },
+      take: 5,
+    });
+
+    for (const m of nameMatches) {
+      candidates.push({
+        id: m.id,
+        customerNumber: m.customerNumber,
+        fullName: m.fullName,
+        primaryPhone: m.primaryPhone,
+        whatsappNumber: m.whatsappNumber,
+        matchScore: 80,
+        matchReason: 'Identical full name match',
+      });
+    }
+
+    return candidates.sort((a, b) => b.matchScore - a.matchScore);
+  }
+
+  /**
+   * Merge duplicate customer into primary target customer
+   */
+  async mergeCustomers(targetCustomerId: string, dto: MergeCustomersDto, user: AuthenticatedUser) {
+    if (user.role !== UserRole.SUPER_ADMIN && user.role !== UserRole.BRANCH_MANAGER) {
+      throw new ForbiddenException('Merging customer profiles requires Branch Manager or Super Admin role.');
+    }
+
+    const target = await this.getCustomerById(targetCustomerId, user);
+    const duplicate = await this.getCustomerById(dto.duplicateCustomerId, user);
+
+    if (target.id === duplicate.id) {
+      throw new BadRequestException('Cannot merge a customer into itself.');
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Move documents
+      await tx.document.updateMany({
+        where: { customerId: duplicate.id },
+        data: { customerId: target.id },
+      });
+
+      // 2. Move passports
+      await tx.passport.updateMany({
+        where: { customerId: duplicate.id },
+        data: { customerId: target.id },
+      });
+
+      // 3. Move visas
+      await tx.visa.updateMany({
+        where: { customerId: duplicate.id },
+        data: { customerId: target.id },
+      });
+
+      // 4. Move bookings
+      await tx.travelBooking.updateMany({
+        where: { customerId: duplicate.id },
+        data: { customerId: target.id },
+      });
+
+      // 5. Move reminders
+      await tx.reminder.updateMany({
+        where: { customerId: duplicate.id },
+        data: { customerId: target.id },
+      });
+
+      // 6. Append merge note to target
+      const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 16);
+      const mergeNote = `\n\n[${timestamp} | MERGED RECORD]: Merged duplicate profile ${duplicate.customerNumber} (${duplicate.fullName}). Reason: ${dto.resolutionReason}`;
+      await tx.customer.update({
+        where: { id: target.id },
+        data: {
+          notes: target.notes ? `${target.notes}${mergeNote}` : mergeNote,
+        },
+      });
+
+      // 7. Mark duplicate customer as deleted/archived
+      await tx.customer.update({
+        where: { id: duplicate.id },
+        data: {
+          isDeleted: true,
+          status: CustomerStatus.ARCHIVED,
+          notes: `[MERGED INTO ${target.customerNumber} on ${timestamp}]: ${dto.resolutionReason}`,
+        },
+      });
+
+      // 8. Audit log
+      await tx.auditLog.create({
+        data: {
+          userId: user.userId,
+          branchId: target.branchId,
+          action: 'CUSTOMERS_MERGED',
+          entityType: 'CUSTOMER',
+          entityId: target.id,
+          newStateJson: {
+            targetCustomerId: target.id,
+            targetCustomerNumber: target.customerNumber,
+            mergedCustomerId: duplicate.id,
+            mergedCustomerNumber: duplicate.customerNumber,
+            reason: dto.resolutionReason,
+          },
+        },
+      });
+    });
+
+    return {
+      success: true,
+      message: `Successfully merged ${duplicate.customerNumber} into ${target.customerNumber}`,
+      targetId: target.id,
+    };
+  }
+
+  /**
+   * Delete relationship link
+   */
+  async deleteRelationship(customerId: string, relationshipId: string, user: AuthenticatedUser) {
+    await this.getCustomerById(customerId, user);
+    await prisma.customerRelationship.delete({
+      where: { id: relationshipId },
+    });
+    return { success: true };
+  }
 }
+
