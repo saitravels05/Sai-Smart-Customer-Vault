@@ -8,6 +8,8 @@ import { AiModule } from './modules/ai/ai.module';
 import { SearchModule } from './modules/search/search.module';
 import { AssistantModule } from './modules/assistant/assistant.module';
 import { RemindersModule } from './modules/reminders/reminders.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { BranchesModule } from './modules/branches/branches.module';
 
 @Module({
   imports: [
@@ -23,6 +25,8 @@ import { RemindersModule } from './modules/reminders/reminders.module';
     SearchModule,
     AssistantModule,
     RemindersModule,
+    DashboardModule,
+    BranchesModule,
   ],
 })
 export class AppModule {}
