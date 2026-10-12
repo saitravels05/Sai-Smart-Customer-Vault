@@ -214,6 +214,9 @@ importers:
       helmet:
         specifier: ^7.1.0
         version: 7.2.0
+      jsonwebtoken:
+        specifier: ^9.0.2
+        version: 9.0.3
       passport:
         specifier: ^0.7.0
         version: 0.7.0
@@ -245,6 +248,9 @@ importers:
       '@types/express':
         specifier: ^4.17.21
         version: 4.17.25
+      '@types/jsonwebtoken':
+        specifier: ^9.0.6
+        version: 9.0.10
       '@types/node':
         specifier: ^20.14.2
         version: 20.19.43

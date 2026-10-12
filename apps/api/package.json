@@ -8,7 +8,7 @@
     "dev": "nest start --watch || ts-node-dev -r tsconfig-paths/register src/main.ts",
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
-    "test": "echo \"Running API tests...\" && exit 0"
+    "test": "ts-node -r tsconfig-paths/register src/modules/auth/auth.spec.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.9",
@@ -24,6 +24,7 @@
     "compression": "^1.7.4",
     "dotenv": "^16.4.5",
     "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
@@ -36,6 +37,7 @@
     "@nestjs/schematics": "^10.1.1",
     "@types/compression": "^1.7.5",
     "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^20.14.2",
     "@types/passport-jwt": "^4.0.1",
     "rimraf": "^5.0.7",

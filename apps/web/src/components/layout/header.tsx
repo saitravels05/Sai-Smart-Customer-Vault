@@ -8,12 +8,19 @@ import {
   UserCheck,
   PlusCircle,
   UploadCloud,
-  Shield,
+  LogOut,
 } from 'lucide-react';
+import { useAuth } from '@/context/auth-context';
+import Link from 'next/link';
 
 export function Header() {
+  const { user, logout, activeBranchId, setActiveBranchId } = useAuth();
   const [selectedBranch, setSelectedBranch] = useState<'madurai' | 'trichy'>('madurai');
   const [currentLang, setCurrentLang] = useState<'en' | 'ta'>('en');
+
+  const handleBranchSelect = (branch: 'madurai' | 'trichy') => {
+    setSelectedBranch(branch);
+  };
 
   return (
     <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between gap-4 sticky top-0 z-20">
@@ -38,7 +45,7 @@ export function Header() {
         <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs">
           <Building2 className="w-3.5 h-3.5 text-slate-500 ml-1.5 mr-1" />
           <button
-            onClick={() => setSelectedBranch('madurai')}
+            onClick={() => handleBranchSelect('madurai')}
             className={`px-2 py-1 rounded text-[11px] font-medium transition ${
               selectedBranch === 'madurai'
                 ? 'bg-[#0B192C] text-white shadow-xs'
@@ -48,7 +55,7 @@ export function Header() {
             Madurai (HO)
           </button>
           <button
-            onClick={() => setSelectedBranch('trichy')}
+            onClick={() => handleBranchSelect('trichy')}
             className={`px-2 py-1 rounded text-[11px] font-medium transition ${
               selectedBranch === 'trichy'
                 ? 'bg-[#0B192C] text-white shadow-xs'
@@ -71,25 +78,44 @@ export function Header() {
 
         {/* Quick Actions */}
         <div className="flex items-center gap-2">
-          <button className="flex items-center gap-1.5 bg-[#E85A18] hover:bg-[#D44E0F] text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-xs transition">
+          <Link
+            href="/customers/new"
+            className="flex items-center gap-1.5 bg-[#E85A18] hover:bg-[#D44E0F] text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-xs transition"
+          >
             <PlusCircle className="w-3.5 h-3.5" />
             <span>New Customer</span>
-          </button>
-          <button className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition">
+          </Link>
+          <Link
+            href="/documents/upload"
+            className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition"
+          >
             <UploadCloud className="w-3.5 h-3.5 text-orange-400" />
             <span>Upload Vault</span>
-          </button>
+          </Link>
         </div>
 
-        {/* User Profile */}
+        {/* User Profile & Logout */}
         <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200">
           <div className="w-8 h-8 rounded-full bg-[#0B192C] text-white flex items-center justify-center font-bold text-xs ring-2 ring-orange-500/20">
-            SA
+            {user?.fullName ? user.fullName.slice(0, 2).toUpperCase() : 'SA'}
           </div>
           <div className="hidden sm:block text-left">
-            <p className="text-xs font-bold text-slate-800 leading-none">Super Admin</p>
-            <span className="text-[10px] text-emerald-600 font-medium">Head Office</span>
+            <p className="text-xs font-bold text-slate-800 leading-none">
+              {user?.fullName || 'Administrator'}
+            </p>
+            <span className="text-[10px] text-emerald-600 font-medium">
+              {user?.branchName || 'Madurai (HO)'}
+            </span>
           </div>
+          {user && (
+            <button
+              onClick={logout}
+              title="Logout"
+              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
     </header>
