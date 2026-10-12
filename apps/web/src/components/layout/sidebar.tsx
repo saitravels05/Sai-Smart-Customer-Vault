@@ -26,6 +26,7 @@ const navigationItems = [
   { name: 'Document Vault', href: '/documents', icon: FolderLock },
   { name: 'AI Verification Queue', href: '/ai-review', icon: FileCheck2, badge: 'AI' },
   { name: 'AI Smart Search', href: '/search', icon: Search },
+  { name: 'SAI AI Assistant', href: '/ai-assistant', icon: Sparkles, badge: 'Copilot' },
   { name: 'Expiry Reminders', href: '/reminders', icon: BellRing, badge: 'Alerts' },
   { name: 'Travel Bookings', href: '/travel', icon: PlaneTakeoff },
   { name: 'Branches', href: '/branches', icon: Building2 },

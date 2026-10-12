@@ -12,11 +12,14 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export function Header() {
+  const router = useRouter();
   const { user, logout, activeBranchId, setActiveBranchId } = useAuth();
   const [selectedBranch, setSelectedBranch] = useState<'madurai' | 'trichy'>('madurai');
   const [currentLang, setCurrentLang] = useState<'en' | 'ta'>('en');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleBranchSelect = (branch: 'madurai' | 'trichy') => {
     setSelectedBranch(branch);
@@ -25,19 +28,29 @@ export function Header() {
   return (
     <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between gap-4 sticky top-0 z-20">
       {/* Global Search Bar */}
-      <div className="flex-1 max-w-lg relative">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (searchQuery.trim()) {
+            router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+          }
+        }}
+        className="flex-1 max-w-lg relative"
+      >
         <div className="relative">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Search customer, passport number, phone, or PNR... (Press / to focus)"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search customer, passport number, phone, or PNR... (Press Enter to search)"
             className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-12 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#E85A18] focus:bg-white transition"
           />
           <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-mono">
-            ⌘K
+            ↵
           </kbd>
         </div>
-      </div>
+      </form>
 
       {/* Right Controls */}
       <div className="flex items-center gap-3">

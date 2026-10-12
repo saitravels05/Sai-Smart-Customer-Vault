@@ -85,3 +85,9 @@ export function maskIdentifier(identifier: string, type: 'PASSPORT' | 'AADHAAR' 
   const suffix = clean.slice(-2);
   return `${prefix}***${suffix}`;
 }
+
+export const hashSearchField = hashField;
+export function maskPassportNumber(passportNumber: string): string {
+  return maskIdentifier(passportNumber, 'PASSPORT');
+}
+
