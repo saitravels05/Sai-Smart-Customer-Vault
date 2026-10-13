@@ -36,6 +36,18 @@ export class AiController {
     };
   }
 
+  @Get('queue')
+  @ApiOperation({ summary: 'Get list of documents in AI extraction verification queue' })
+  async getQueue(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<any> {
+    const result = await this.aiService.getQueue(user);
+    return {
+      statusCode: HttpStatus.OK,
+      data: result,
+    };
+  }
+
   @Get('jobs/:jobId')
   @ApiOperation({ summary: 'Get AI extraction result and confidence scores by job ID' })
   async getJobResult(

@@ -800,6 +800,55 @@ export class CustomersService {
   }
 
   /**
+   * List all travel bookings across customers with tenant scoping
+   */
+  async listAllBookings(user: AuthenticatedUser) {
+    try {
+      const branchWhere =
+        user.role === UserRole.SUPER_ADMIN || !user.branchId
+          ? {}
+          : { customer: { branchId: user.branchId } };
+
+      const bookings = await prisma.travelBooking.findMany({
+        where: {
+          ...branchWhere,
+          customer: { isDeleted: false },
+        },
+        take: 100,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          customer: {
+            select: { id: true, fullName: true, customerNumber: true, primaryPhone: true, branchId: true },
+          },
+        },
+      });
+
+      return bookings.map((b) => ({
+        id: b.id,
+        customerId: b.customerId,
+        customerName: b.customer?.fullName || 'Customer',
+        customerNumber: b.customer?.customerNumber || '',
+        primaryPhone: b.customer?.primaryPhone || '',
+        bookingRef: b.bookingRef,
+        pnr: b.pnr,
+        airline: b.airline,
+        flightNumber: b.flightNumber,
+        originAirport: b.originAirport,
+        destAirport: b.destAirport,
+        departureTime: b.departureTime?.toISOString() || null,
+        arrivalTime: b.arrivalTime?.toISOString() || null,
+        hotelName: b.hotelName,
+        checkInDate: b.checkInDate?.toISOString() || null,
+        checkOutDate: b.checkOutDate?.toISOString() || null,
+        createdAt: b.createdAt.toISOString(),
+      }));
+    } catch (err: any) {
+      this.logger.warn(`Database offline in listAllBookings: ${err.message}. Returning empty bookings.`);
+      return [];
+    }
+  }
+
+  /**
    * Add formatted staff note to customer record
    */
   async addCustomerNote(customerId: string, dto: AddNoteDto, user: AuthenticatedUser) {

@@ -39,6 +39,10 @@ async function runSmokeTests() {
     { url: 'http://localhost:3000/login', name: 'Web Portal Login Interface' },
     { url: 'http://localhost:3000/', name: 'Web Portal Dashboard' },
     { url: 'http://localhost:3000/favicon.ico', name: 'Web Portal Favicon' },
+    { url: 'http://localhost:3000/ai-review', name: 'AI Verification Queue' },
+    { url: 'http://localhost:3000/travel', name: 'Travel Bookings' },
+    { url: 'http://localhost:3000/settings', name: 'Settings' },
+    { url: 'http://localhost:3000/documents/upload', name: 'Document Vault Upload' },
   ];
 
   let passed = 0;

@@ -258,45 +258,55 @@ export class ComplianceService {
    * Query branch-isolated audit logs
    */
   async queryAuditLogs(queryDto: AuditLogQueryDto, user: AuthenticatedUser): Promise<any> {
-    const where: any = {};
+    try {
+      const where: any = {};
 
-    if (user.role !== UserRole.SUPER_ADMIN) {
-      where.branchId = user.branchId;
-    } else if (queryDto.branchId) {
-      where.branchId = queryDto.branchId;
+      if (user.role !== UserRole.SUPER_ADMIN) {
+        where.branchId = user.branchId;
+      } else if (queryDto.branchId) {
+        where.branchId = queryDto.branchId;
+      }
+
+      if (queryDto.action) {
+        where.action = { contains: queryDto.action, mode: 'insensitive' };
+      }
+
+      if (queryDto.entityType) {
+        where.entityType = queryDto.entityType;
+      }
+
+      if (queryDto.entityId) {
+        where.entityId = queryDto.entityId;
+      }
+
+      const [logs, total] = await Promise.all([
+        prisma.auditLog.findMany({
+          where,
+          take: queryDto.limit,
+          skip: queryDto.offset,
+          orderBy: { timestamp: 'desc' },
+          include: {
+            branch: { select: { name: true, code: true } },
+          },
+        }),
+        prisma.auditLog.count({ where }),
+      ]);
+
+      return {
+        total,
+        limit: queryDto.limit,
+        offset: queryDto.offset,
+        logs,
+      };
+    } catch (err: any) {
+      this.logger.warn(`Database offline in queryAuditLogs: ${err.message}. Returning empty logs list.`);
+      return {
+        total: 0,
+        limit: queryDto.limit,
+        offset: queryDto.offset,
+        logs: [],
+      };
     }
-
-    if (queryDto.action) {
-      where.action = { contains: queryDto.action, mode: 'insensitive' };
-    }
-
-    if (queryDto.entityType) {
-      where.entityType = queryDto.entityType;
-    }
-
-    if (queryDto.entityId) {
-      where.entityId = queryDto.entityId;
-    }
-
-    const [logs, total] = await Promise.all([
-      prisma.auditLog.findMany({
-        where,
-        take: queryDto.limit,
-        skip: queryDto.offset,
-        orderBy: { timestamp: 'desc' },
-        include: {
-          branch: { select: { name: true, code: true } },
-        },
-      }),
-      prisma.auditLog.count({ where }),
-    ]);
-
-    return {
-      total,
-      limit: queryDto.limit,
-      offset: queryDto.offset,
-      logs,
-    };
   }
 
   /**

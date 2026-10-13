@@ -94,6 +94,16 @@ export class CustomersController {
     };
   }
 
+  @Get('bookings/all')
+  @ApiOperation({ summary: 'List all travel bookings across customers with tenant scoping' })
+  async listAllBookings(@CurrentUser() user: AuthenticatedUser) {
+    const bookings = await this.customersService.listAllBookings(user);
+    return {
+      success: true,
+      data: bookings,
+    };
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Retrieve full customer profile details' })
   @ApiParam({ name: 'id', description: 'Customer UUID' })

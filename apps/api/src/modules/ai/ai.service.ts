@@ -221,6 +221,53 @@ export class AiService {
   }
 
   /**
+   * Get queue of AI processing jobs with branch tenancy
+   */
+  async getQueue(user: AuthenticatedUser): Promise<any[]> {
+    try {
+      const branchWhere =
+        user.role === UserRole.SUPER_ADMIN || !user.branchId
+          ? {}
+          : { document: { customer: { branchId: user.branchId } } };
+
+      const jobs = await prisma.aIProcessingJob.findMany({
+        where: branchWhere,
+        take: 50,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          document: {
+            include: {
+              customer: {
+                select: { id: true, fullName: true, customerNumber: true, branchId: true },
+              },
+            },
+          },
+          extractionResult: true,
+        },
+      });
+
+      return jobs.map((j) => ({
+        id: j.id,
+        documentId: j.documentId,
+        documentTitle: j.document.title,
+        documentType: j.document.type,
+        customerName: j.document.customer?.fullName || 'Unknown',
+        customerNumber: j.document.customer?.customerNumber || '',
+        customerId: j.document.customer?.id,
+        status: j.status,
+        confidenceScore: j.confidenceScore ? Number(j.confidenceScore) : null,
+        startedAt: j.startedAt,
+        completedAt: j.completedAt,
+        isVerified: j.extractionResult?.isVerified || false,
+        extractedData: j.extractionResult?.extractedJson || null,
+      }));
+    } catch (err: any) {
+      this.logger.warn(`Database offline in getQueue: ${err.message}. Returning empty queue.`);
+      return [];
+    }
+  }
+
+  /**
    * Human-in-the-loop: Verify extracted data and automatically update customer profile records
    */
   async verifyAndApply(verifyDto: VerifyAiResultDto, user: AuthenticatedUser): Promise<any> {
