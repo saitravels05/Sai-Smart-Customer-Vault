@@ -10,6 +10,7 @@ import { AssistantModule } from './modules/assistant/assistant.module';
 import { RemindersModule } from './modules/reminders/reminders.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { BranchesModule } from './modules/branches/branches.module';
+import { ComplianceModule } from './modules/compliance/compliance.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { BranchesModule } from './modules/branches/branches.module';
     RemindersModule,
     DashboardModule,
     BranchesModule,
+    ComplianceModule,
   ],
 })
 export class AppModule {}

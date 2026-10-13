@@ -38,6 +38,10 @@ import {
   Check,
   Tag,
   Share2,
+  ShieldCheck,
+  ShieldAlert,
+  FileSignature,
+  EyeOff,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { formatDateTime, maskIdentifier } from '@/lib/utils';
@@ -49,6 +53,7 @@ import {
   AddBookingDto,
   AddNoteDto,
   DuplicateCandidateDto,
+  ConsentPurpose,
 } from '@sai/shared-types';
 
 export default function CustomerProfilePage() {
@@ -60,8 +65,10 @@ export default function CustomerProfilePage() {
   const [customer, setCustomer] = useState<any | null>(null);
   const [timeline, setTimeline] = useState<any[]>([]);
   const [duplicates, setDuplicates] = useState<DuplicateCandidateDto[]>([]);
+  const [consents, setConsents] = useState<any[]>([]);
+  const [loadingConsents, setLoadingConsents] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'credentials' | 'documents' | 'bookings' | 'notes' | 'family' | 'timeline'
+    'overview' | 'credentials' | 'documents' | 'bookings' | 'notes' | 'family' | 'timeline' | 'compliance'
   >('overview');
   const [isLoading, setIsLoading] = useState(true);
   const [actionInProgress, setActionInProgress] = useState(false);
@@ -74,6 +81,9 @@ export default function CustomerProfilePage() {
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [showFamilyModal, setShowFamilyModal] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
+  const [showConsentModal, setShowConsentModal] = useState(false);
+  const [showErasureModal, setShowErasureModal] = useState(false);
+  const [consentToRevoke, setConsentToRevoke] = useState<any | null>(null);
   const [selectedDuplicate, setSelectedDuplicate] = useState<DuplicateCandidateDto | null>(null);
 
   // Copy state helper
@@ -83,6 +93,7 @@ export default function CustomerProfilePage() {
     if (customerId) {
       loadCustomer();
       loadDuplicates();
+      loadConsents();
     }
   }, [customerId]);
 
@@ -121,6 +132,20 @@ export default function CustomerProfilePage() {
         setTimeline(res.data.timeline);
       }
     } catch {}
+  };
+
+  const loadConsents = async () => {
+    try {
+      setLoadingConsents(true);
+      const res: any = await apiClient.get(`/compliance/customers/${customerId}/consents`);
+      if (res?.data) {
+        setConsents(res.data);
+      }
+    } catch (err) {
+      console.warn('Could not load customer consents:', err);
+    } finally {
+      setLoadingConsents(false);
+    }
   };
 
   const handleArchiveToggle = async () => {
@@ -433,6 +458,7 @@ export default function CustomerProfilePage() {
             { id: 'notes', label: `Staff Notes (${parseNotes(customer.notes).length})` },
             { id: 'family', label: `Family & Co-Travelers (${customer.relationshipsFrom?.length || 0})` },
             { id: 'timeline', label: 'Activity Timeline', onClick: loadTimeline },
+            { id: 'compliance', label: `DPDPA & Privacy (${consents.length})`, onClick: loadConsents },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -481,12 +507,23 @@ export default function CustomerProfilePage() {
                   {formatDateTime(customer.registeredAt)}
                 </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-50">
+              <div className="flex justify-between py-1 border-b border-slate-50 items-center">
                 <span className="text-slate-500">DPDPA 2023 Consent:</span>
-                <span className="font-semibold text-emerald-700 flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('compliance');
+                    loadConsents();
+                  }}
+                  className="font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 hover:underline cursor-pointer"
+                >
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Consent Verified & Recorded</span>
-                </span>
+                  <span>
+                    {consents.length > 0
+                      ? `${consents.filter((c: any) => c.isGranted).length} Active Consents Recorded`
+                      : 'DPDPA Notice v2023.1 Recorded'}
+                  </span>
+                </button>
               </div>
               <div className="flex justify-between py-1 border-slate-50">
                 <span className="text-slate-500">Assigned Branch & Staff:</span>
@@ -1033,6 +1070,203 @@ export default function CustomerProfilePage() {
         </div>
       )}
 
+      {/* Tab 8: DPDPA & Privacy Compliance */}
+      {activeTab === 'compliance' && (
+        <div className="space-y-6">
+          {/* Statutory DPDPA & UIDAI Banner */}
+          <div className="bg-gradient-to-r from-slate-900 via-[#0B192C] to-[#1E3E62] text-white p-6 rounded-xl border border-slate-700 shadow-md">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    DPDPA 2023 Compliant
+                  </span>
+                  <span className="bg-blue-500/20 text-blue-300 border border-blue-500/40 font-mono text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5" />
+                    UIDAI Masking (XXXX-XXXX-####)
+                  </span>
+                  <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+                    Notice Version: v2023.1
+                  </span>
+                </div>
+                <h3 className="text-base font-bold text-white">
+                  Statutory Privacy & Data Fiduciary Compliance
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 text-xs text-slate-300">
+                  <div className="bg-white/5 p-3 rounded-lg border border-white/10">
+                    <p className="font-semibold text-white mb-0.5 flex items-center gap-1">
+                      <span>English Notice (DPDPA 2023)</span>
+                    </p>
+                    <p className="leading-relaxed text-slate-300">
+                      Personal identity documents and credentials collected by SAI TOURS & TRAVELS (Madurai & Trichy) are strictly protected under AES-256-GCM encryption. Data is processed solely for authorized consular visa processing and air ticketing.
+                    </p>
+                  </div>
+                  <div className="bg-white/5 p-3 rounded-lg border border-white/10">
+                    <p className="font-semibold text-white mb-0.5 flex items-center gap-1">
+                      <span>தமிழ் சட்டப்பூர்வ அறிவிப்பு (DPDPA 2023)</span>
+                    </p>
+                    <p className="leading-relaxed text-slate-300">
+                      சாய் டூர்ஸ் & டிராவல்ஸ் நிறுவனத்தால் சேகரிக்கப்படும் கடவுச்சீட்டு மற்றும் விசா விபரங்கள் AES-256-GCM மூலம் மறைகுறியாக்கப்பட்டு பாதுகாக்கப்படுகின்றன. இவை தூதரக விசா மற்றும் பயணச்சீட்டு பணிகளுக்கு மட்டுமே சட்டப்பூர்வமாகப் பயன்படுத்தப்படுகின்றன.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Consents Management Card */}
+          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div>
+                <h4 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                  <FileSignature className="w-4 h-4 text-[#E85A18]" />
+                  <span>Statutory Consent Registry</span>
+                </h4>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Legal consent ledger recording specific authorizations for travel operations and alerts.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowConsentModal(true)}
+                className="inline-flex items-center gap-1.5 bg-[#0B192C] hover:bg-[#1E3E62] text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition shrink-0"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>Record New Consent</span>
+              </button>
+            </div>
+
+            {loadingConsents ? (
+              <div className="py-8 text-center text-slate-400 space-y-2">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#E85A18]" />
+                <p className="text-xs">Loading statutory consents...</p>
+              </div>
+            ) : consents.length === 0 ? (
+              <div className="text-center py-8 border border-dashed border-slate-200 rounded-xl space-y-2">
+                <FileSignature className="w-6 h-6 text-slate-300 mx-auto" />
+                <p className="text-xs text-slate-500 font-medium">No explicit consent records logged yet.</p>
+                <button
+                  onClick={() => setShowConsentModal(true)}
+                  className="text-xs text-[#E85A18] font-bold hover:underline"
+                >
+                  + Record Customer Consent
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {consents.map((consent: any) => (
+                  <div
+                    key={consent.id}
+                    className={`p-4 rounded-xl border text-xs space-y-2.5 transition ${
+                      consent.isGranted
+                        ? 'border-emerald-200 bg-emerald-50/30'
+                        : 'border-slate-200 bg-slate-50/70 opacity-80'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`font-bold px-2 py-0.5 rounded text-[10px] uppercase ${
+                              consent.isGranted
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-rose-100 text-rose-800'
+                            }`}
+                          >
+                            {consent.isGranted ? 'ACTIVE CONSENT' : 'REVOKED'}
+                          </span>
+                          <span className="font-mono text-[11px] text-slate-500">
+                            {consent.noticeVersion}
+                          </span>
+                        </div>
+                        <h5 className="font-bold text-slate-900 text-xs">
+                          {consent.purpose.replace(/_/g, ' ')}
+                        </h5>
+                      </div>
+
+                      {consent.isGranted && (
+                        <button
+                          onClick={() => setConsentToRevoke(consent)}
+                          className="text-[11px] font-semibold text-rose-600 hover:text-rose-800 px-2 py-1 rounded hover:bg-rose-50 transition"
+                        >
+                          Revoke
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-slate-600 text-[11px] pt-1 border-t border-slate-100">
+                      <div>
+                        <span className="text-slate-400 block text-[10px]">Granted On:</span>
+                        <span className="font-medium text-slate-800">
+                          {formatDateTime(consent.recordedAt)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px]">Client IP:</span>
+                        <span className="font-mono text-slate-800">{consent.ipAddress || 'Internal Staff'}</span>
+                      </div>
+                    </div>
+
+                    {!consent.isGranted && consent.revokedAt && (
+                      <div className="p-2 rounded bg-rose-50 border border-rose-200 text-[11px] text-rose-800 space-y-0.5">
+                        <span className="font-bold block">Revoked on {formatDateTime(consent.revokedAt)}</span>
+                        <p className="italic">Reason: {consent.revocationReason || 'Customer requested withdrawal.'}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* DPDPA Section 12: Statutory Right to Erasure */}
+          <div className="bg-rose-50/50 border border-rose-200 rounded-xl p-5 space-y-4 shadow-2xs">
+            <div className="flex items-start gap-3">
+              <ShieldAlert className="w-5 h-5 text-rose-700 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-bold text-xs text-rose-900 uppercase tracking-wide">
+                    DPDPA 2023 Section 12 — Right to Erasure / Profile Anonymization
+                  </h4>
+                  <span className="text-[10px] font-bold bg-rose-200 text-rose-900 px-2 py-0.5 rounded-full">
+                    Statutory Mandate
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Under the Digital Personal Data Protection Act (DPDPA 2023), customers are entitled to request the permanent erasure and anonymization of their personally identifiable information (PII) once travel requirements have concluded.
+                </p>
+                <div className="text-[11px] text-slate-500 pt-1 space-y-1">
+                  <p>• Full Name will be irreversibly replaced with <code className="bg-rose-100 px-1 py-0.5 rounded text-rose-800 font-mono">[DPDPA ANONYMIZED]</code>.</p>
+                  <p>• Mobile numbers, WhatsApp, Email, and physical addresses are scrubbed.</p>
+                  <p>• Passports and sensitive travel documents are deleted, while preserving non-identifiable financial UUIDs for mandatory GST audit trails.</p>
+                </div>
+              </div>
+            </div>
+
+            {isSuperAdminOrBranchManager && (
+              <div className="pt-2 border-t border-rose-200/80 flex items-center justify-between">
+                <span className="text-xs font-semibold text-rose-800">
+                  {customer.fullName.includes('DPDPA ANONYMIZED') || customer.notes?.includes('CUSTOMER_DPDPA_ANONYMIZED')
+                    ? 'Customer record has already been statutory anonymized.'
+                    : 'Requires Manager or Super Admin statutory authorization.'}
+                </span>
+                <button
+                  onClick={() => setShowErasureModal(true)}
+                  disabled={
+                    customer.fullName.includes('DPDPA ANONYMIZED') ||
+                    customer.notes?.includes('CUSTOMER_DPDPA_ANONYMIZED')
+                  }
+                  className="inline-flex items-center gap-1.5 bg-rose-700 hover:bg-rose-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-3.5 py-1.5 rounded-lg text-xs font-bold transition shadow-2xs"
+                >
+                  <EyeOff className="w-3.5 h-3.5" />
+                  <span>Execute Right to Erasure</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ======================================================== */}
       {/* MODAL 1: ADD PASSPORT MODAL */}
       {/* ======================================================== */}
@@ -1123,6 +1357,56 @@ export default function CustomerProfilePage() {
             setStatusFeedback({
               type: 'success',
               message: `Successfully merged profile ${selectedDuplicate.customerNumber} into ${customer.customerNumber}`,
+            });
+          }}
+        />
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL 7: RECORD DPDPA CONSENT */}
+      {/* ======================================================== */}
+      {showConsentModal && (
+        <RecordConsentModal
+          customerId={customerId}
+          onClose={() => setShowConsentModal(false)}
+          onSuccess={() => {
+            setShowConsentModal(false);
+            loadConsents();
+            setStatusFeedback({ type: 'success', message: 'Statutory DPDPA consent recorded successfully' });
+          }}
+        />
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL 8: REVOKE CONSENT */}
+      {/* ======================================================== */}
+      {consentToRevoke && (
+        <RevokeConsentModal
+          customerId={customerId}
+          consent={consentToRevoke}
+          onClose={() => setConsentToRevoke(null)}
+          onSuccess={() => {
+            setConsentToRevoke(null);
+            loadConsents();
+            setStatusFeedback({ type: 'success', message: 'Consent successfully revoked' });
+          }}
+        />
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL 9: DPDPA RIGHT TO ERASURE / ANONYMIZATION */}
+      {/* ======================================================== */}
+      {showErasureModal && (
+        <AnonymizeCustomerModal
+          customer={customer}
+          onClose={() => setShowErasureModal(false)}
+          onSuccess={() => {
+            setShowErasureModal(false);
+            loadCustomer();
+            loadConsents();
+            setStatusFeedback({
+              type: 'success',
+              message: 'Customer PII has been permanently anonymized pursuant to DPDPA 2023 Section 12.',
             });
           }}
         />
@@ -2094,3 +2378,411 @@ function MergeCustomerModal({
     </div>
   );
 }
+
+// ----------------------------------------------------
+// DPDPA & STATUTORY COMPLIANCE MODALS
+// ----------------------------------------------------
+
+function RecordConsentModal({
+  customerId,
+  onClose,
+  onSuccess,
+}: {
+  customerId: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [purpose, setPurpose] = useState<ConsentPurpose>(ConsentPurpose.PASSPORT_PROCESSING);
+  const [language, setLanguage] = useState<'ENGLISH' | 'TAMIL'>('ENGLISH');
+  const [noticeVersion, setNoticeVersion] = useState('v2023.1');
+  const [notes, setNotes] = useState('');
+  const [agreed, setAgreed] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!agreed) {
+      setError('You must confirm statutory customer authorization');
+      return;
+    }
+    try {
+      setIsSubmitting(true);
+      setError(null);
+      await apiClient.post(`/compliance/customers/${customerId}/consents`, {
+        purpose,
+        language,
+        noticeVersion,
+        notes: notes || undefined,
+      });
+      onSuccess();
+    } catch (err: any) {
+      setError(err.message || 'Failed to record consent');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 space-y-4 animate-in zoom-in-95 duration-150">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <FileSignature className="w-5 h-5 text-[#E85A18]" />
+            <div>
+              <h3 className="font-bold text-sm text-slate-900">Record Statutory DPDPA Consent</h3>
+              <p className="text-[11px] text-slate-500">Digital Personal Data Protection Act (DPDPA 2023)</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="p-2.5 rounded bg-rose-50 border border-rose-200 text-rose-800 text-xs">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          <div>
+            <label className="font-semibold text-slate-700 block mb-1">Consent Purpose *</label>
+            <select
+              value={purpose}
+              onChange={(e) => setPurpose(e.target.value as ConsentPurpose)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E85A18]"
+            >
+              <option value={ConsentPurpose.PASSPORT_PROCESSING}>Passport Processing & Verification</option>
+              <option value={ConsentPurpose.VISA_APPLICATION}>Consular Visa Application Submission</option>
+              <option value={ConsentPurpose.FLIGHT_BOOKING}>Air Ticket Booking & Passenger Name Records</option>
+              <option value={ConsentPurpose.WHATSAPP_ALERTS}>WhatsApp Flight & Expiry Notifications</option>
+              <option value={ConsentPurpose.DOCUMENT_VAULT_STORAGE}>Encrypted Document Vault Storage</option>
+              <option value={ConsentPurpose.MARKETING_UPDATES}>Travel Updates & Package Announcements</option>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">Notice Language</label>
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value as any)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E85A18]"
+              >
+                <option value="ENGLISH">English (ஆங்கிலம்)</option>
+                <option value="TAMIL">Tamil (தமிழ்)</option>
+              </select>
+            </div>
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">Notice Version</label>
+              <input
+                type="text"
+                value={noticeVersion}
+                onChange={(e) => setNoticeVersion(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-[#E85A18]"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="font-semibold text-slate-700 block mb-1">Authorization Notes (Optional)</label>
+            <input
+              type="text"
+              placeholder="e.g. Counter form signed / verbal WhatsApp confirmation"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E85A18]"
+            />
+          </div>
+
+          <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-[11px] text-slate-600 space-y-1">
+            <p className="font-semibold text-slate-800">Statutory Notice Disclaimer:</p>
+            <p className="leading-relaxed">
+              Customer gives informed consent for SAI TOURS & TRAVELS to store and process their personal identity details strictly for the chosen service.
+            </p>
+            <p className="leading-relaxed font-tamil text-slate-500 pt-0.5">
+              வாடிக்கையாளர் தனது தனிப்பட்ட விபரங்களை பயண பணிகளுக்குப் பயன்படுத்த முழு மனதுடன் சம்மதம் தெரிவிக்கிறார்.
+            </p>
+          </div>
+
+          <label className="flex items-start gap-2 cursor-pointer pt-1">
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              className="mt-0.5 rounded text-[#E85A18] focus:ring-[#E85A18]"
+            />
+            <span className="text-[11px] text-slate-700">
+              I verify that informed consent has been obtained from the customer as required by DPDPA 2023.
+            </span>
+          </label>
+
+          <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting || !agreed}
+              className="px-4 py-2 bg-[#0B192C] hover:bg-[#1E3E62] text-white rounded-lg font-bold transition flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
+            >
+              {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              <span>Record Consent</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function RevokeConsentModal({
+  customerId,
+  consent,
+  onClose,
+  onSuccess,
+}: {
+  customerId: string;
+  consent: any;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [reason, setReason] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleRevoke = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (reason.trim().length < 3) {
+      setError('Revocation reason must be at least 3 characters');
+      return;
+    }
+    try {
+      setIsSubmitting(true);
+      setError(null);
+      await apiClient.post(`/compliance/customers/${customerId}/consents/${consent.id}/revoke`, {
+        reason,
+      });
+      onSuccess();
+    } catch (err: any) {
+      setError(err.message || 'Failed to revoke consent');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-md w-full p-6 space-y-4 animate-in zoom-in-95 duration-150">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-5 h-5 text-rose-600" />
+            <div>
+              <h3 className="font-bold text-sm text-slate-900">Revoke Customer Consent</h3>
+              <p className="text-[11px] text-slate-500">DPDPA 2023 Consent Withdrawal</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="p-2.5 rounded bg-rose-50 border border-rose-200 text-rose-800 text-xs">
+            {error}
+          </div>
+        )}
+
+        <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900 space-y-1">
+          <p className="font-bold">Revoking Consent for:</p>
+          <p className="font-semibold text-slate-800">{consent.purpose.replace(/_/g, ' ')}</p>
+          <p className="text-[11px] text-slate-600">
+            Once revoked, the agency must stop processing data for this specific purpose.
+          </p>
+        </div>
+
+        <form onSubmit={handleRevoke} className="space-y-4 text-xs">
+          <div>
+            <label className="font-semibold text-slate-700 block mb-1">Revocation Reason *</label>
+            <textarea
+              required
+              rows={3}
+              placeholder="e.g. Customer requested stop of promotional messages / travel contract completed"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
+            />
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting || reason.trim().length < 3}
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold transition flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
+            >
+              {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              <span>Confirm Revocation</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function AnonymizeCustomerModal({
+  customer,
+  onClose,
+  onSuccess,
+}: {
+  customer: any;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [confirmText, setConfirmText] = useState('');
+  const [reason, setReason] = useState('');
+  const [confirmed, setConfirmed] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleAnonymize = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (confirmText.trim() !== 'ANONYMIZE') {
+      setError('You must type ANONYMIZE in capital letters to confirm');
+      return;
+    }
+    if (reason.trim().length < 5) {
+      setError('Statutory erasure justification must be at least 5 characters');
+      return;
+    }
+    if (!confirmed) {
+      setError('Please check the acknowledgement box');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setError(null);
+      await apiClient.post(`/compliance/customers/${customer.id}/anonymize`, {
+        reason,
+        confirmAnonymization: true,
+      });
+      onSuccess();
+    } catch (err: any) {
+      setError(err.message || 'Failed to anonymize customer record');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 space-y-4 animate-in zoom-in-95 duration-150">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <EyeOff className="w-5 h-5 text-rose-700" />
+            <div>
+              <h3 className="font-bold text-sm text-slate-900">Execute DPDPA Right to Erasure</h3>
+              <p className="text-[11px] text-slate-500">Section 12 Statutory Anonymization</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="p-2.5 rounded bg-rose-50 border border-rose-200 text-rose-800 text-xs">
+            {error}
+          </div>
+        )}
+
+        <div className="p-3 bg-rose-50 border border-rose-300 rounded-lg text-xs text-rose-900 space-y-1.5">
+          <p className="font-bold flex items-center gap-1.5">
+            <AlertTriangle className="w-4 h-4 text-rose-700 shrink-0" />
+            <span>CRITICAL WARNING: This action cannot be reversed!</span>
+          </p>
+          <ul className="list-disc list-inside space-y-0.5 text-[11px] text-rose-800">
+            <li>Customer Name <strong className="font-semibold">{customer.fullName}</strong> will be permanently replaced with <span className="font-mono">[DPDPA ANONYMIZED]</span>.</li>
+            <li>All phone numbers, emails, and address strings will be deleted.</li>
+            <li>Passports and document files will be purged.</li>
+            <li>Financial transaction ledger UUIDs will remain for GST compliance.</li>
+          </ul>
+        </div>
+
+        <form onSubmit={handleAnonymize} className="space-y-4 text-xs">
+          <div>
+            <label className="font-semibold text-slate-700 block mb-1">
+              Legal / Customer Request Reason *
+            </label>
+            <textarea
+              required
+              rows={2}
+              placeholder="e.g. Formal request under DPDPA 2023 Sec 12 received via written notice"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
+            />
+          </div>
+
+          <div>
+            <label className="font-semibold text-slate-700 block mb-1">
+              Type <span className="font-mono text-rose-700 font-bold">ANONYMIZE</span> to confirm *
+            </label>
+            <input
+              type="text"
+              required
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="ANONYMIZE"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-rose-500 uppercase"
+            />
+          </div>
+
+          <label className="flex items-start gap-2 cursor-pointer pt-1">
+            <input
+              type="checkbox"
+              checked={confirmed}
+              onChange={(e) => setConfirmed(e.target.checked)}
+              className="mt-0.5 rounded text-rose-600 focus:ring-rose-500"
+            />
+            <span className="text-[11px] text-slate-700">
+              I certify that this statutory erasure request complies with DPDPA 2023 and has been approved by authorized management.
+            </span>
+          </label>
+
+          <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting || confirmText !== 'ANONYMIZE' || !confirmed || reason.trim().length < 5}
+              className="px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white rounded-lg font-bold transition flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
+            >
+              {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              <span>Execute Irreversible Erasure</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+

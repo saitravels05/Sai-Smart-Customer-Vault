@@ -10,5 +10,6 @@ export * from './reminder.dto.js';
 export * from './dashboard.dto.js';
 export * from './branch.dto.js';
 export * from './localization.js';
+export * from './compliance.dto.js';
 
 
