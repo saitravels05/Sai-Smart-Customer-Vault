@@ -1,12 +1,21 @@
 'use client';
 
 import React, { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
 import { MobileBottomNav } from './mobile-bottom-nav';
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const pathname = usePathname();
+
+  // On authentication routes, render the auth screen directly without dashboard chrome
+  const isAuthRoute = pathname === '/login' || pathname === '/mfa';
+
+  if (isAuthRoute) {
+    return <main className="w-full min-h-screen">{children}</main>;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex w-full">

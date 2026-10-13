@@ -39,7 +39,12 @@ export default function DashboardPage() {
   const [analytics, setAnalytics] = useState<DashboardAnalyticsDto | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedBranch, setSelectedBranch] = useState<string>('ALL');
-  const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const [mounted, setMounted] = useState<boolean>(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -255,7 +260,10 @@ export default function DashboardPage() {
           </div>
 
           <div className="text-[11px] text-slate-400">
-            Last telemetry sync: <span className="text-slate-200">{lastRefreshed.toLocaleTimeString()}</span>
+            Last telemetry sync:{' '}
+            <span className="text-slate-200" suppressHydrationWarning>
+              {mounted && lastRefreshed ? lastRefreshed.toLocaleTimeString() : 'Live'}
+            </span>
           </div>
         </div>
       </div>
