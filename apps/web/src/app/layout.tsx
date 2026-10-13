@@ -10,7 +10,12 @@ export const metadata: Metadata = {
   description:
     'AI-Powered Customer & Document Management System for SAI TOURS & TRAVELS (Madurai Head Office & Trichy Branch).',
   icons: {
-    icon: '/branding/logo.jpg',
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/branding/logo.jpg' },
+    ],
+    shortcut: '/favicon.ico',
+    apple: '/branding/logo.jpg',
   },
 };
 

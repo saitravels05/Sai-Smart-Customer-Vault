@@ -37,6 +37,8 @@ async function runSmokeTests() {
     { url: 'http://localhost:4000/api/v1/health/liveness', name: 'Container Liveness Probe' },
     { url: 'http://localhost:4000/api/v1/health/readiness', name: 'Database & Storage Readiness Probe' },
     { url: 'http://localhost:3000/login', name: 'Web Portal Login Interface' },
+    { url: 'http://localhost:3000/', name: 'Web Portal Dashboard' },
+    { url: 'http://localhost:3000/favicon.ico', name: 'Web Portal Favicon' },
   ];
 
   let passed = 0;

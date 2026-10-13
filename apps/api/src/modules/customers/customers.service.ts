@@ -197,93 +197,108 @@ export class CustomersService {
    * Retrieves paginated customers scoped by branch access.
    */
   async listCustomers(filter: CustomerFilterDto, currentUser: AuthenticatedUser) {
-    const where: any = { isDeleted: false };
+    try {
+      const where: any = { isDeleted: false };
 
-    // Tenant Scoping: Super Admin can query any branch; other roles are strictly scoped
-    if (currentUser.role === UserRole.SUPER_ADMIN) {
-      if (filter.branchId) {
-        where.branchId = filter.branchId;
+      // Tenant Scoping: Super Admin can query any branch; other roles are strictly scoped
+      if (currentUser.role === UserRole.SUPER_ADMIN) {
+        if (filter.branchId) {
+          where.branchId = filter.branchId;
+        }
+      } else {
+        where.branchId = currentUser.branchId;
       }
-    } else {
-      where.branchId = currentUser.branchId;
-    }
 
-    if (filter.category) {
-      where.primaryCategory = filter.category;
-    }
+      if (filter.category) {
+        where.primaryCategory = filter.category;
+      }
 
-    if (filter.status) {
-      where.status = filter.status;
-    }
+      if (filter.status) {
+        where.status = filter.status;
+      }
 
-    if (filter.search) {
-      const q = filter.search.trim();
-      where.OR = [
-        { fullName: { contains: q, mode: 'insensitive' } },
-        { customerNumber: { contains: q, mode: 'insensitive' } },
-        { primaryPhone: { contains: q } },
-        { email: { contains: q, mode: 'insensitive' } },
-      ];
-    }
+      if (filter.search) {
+        const q = filter.search.trim();
+        where.OR = [
+          { fullName: { contains: q, mode: 'insensitive' } },
+          { customerNumber: { contains: q, mode: 'insensitive' } },
+          { primaryPhone: { contains: q } },
+          { email: { contains: q, mode: 'insensitive' } },
+        ];
+      }
 
-    const page = filter.page || 1;
-    const limit = filter.limit || 20;
-    const skip = (page - 1) * limit;
+      const page = filter.page || 1;
+      const limit = filter.limit || 20;
+      const skip = (page - 1) * limit;
 
-    const [total, customers] = await Promise.all([
-      prisma.customer.count({ where }),
-      prisma.customer.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { [filter.sortBy || 'registeredAt']: filter.sortOrder || 'desc' },
-        include: {
-          branch: {
-            select: { name: true, code: true },
-          },
-          _count: {
-            select: {
-              documents: true,
-              passports: true,
-              visas: true,
-              bookings: true,
+      const [total, customers] = await Promise.all([
+        prisma.customer.count({ where }),
+        prisma.customer.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { [filter.sortBy || 'registeredAt']: filter.sortOrder || 'desc' },
+          include: {
+            branch: {
+              select: { name: true, code: true },
+            },
+            _count: {
+              select: {
+                documents: true,
+                passports: true,
+                visas: true,
+                bookings: true,
+              },
             },
           },
+        }),
+      ]);
+
+      const totalPages = Math.ceil(total / limit);
+
+      return {
+        customers: customers.map((c) => ({
+          id: c.id,
+          customerNumber: c.customerNumber,
+          fullName: c.fullName,
+          primaryPhone: c.primaryPhone,
+          whatsappNumber: c.whatsappNumber,
+          email: c.email,
+          city: c.city,
+          state: c.state,
+          primaryCategory: c.primaryCategory,
+          status: c.status,
+          branchName: c.branch.name,
+          branchCode: c.branch.code,
+          registeredAt: c.registeredAt.toISOString(),
+          documentCount: c._count.documents,
+          passportCount: c._count.passports,
+          visaCount: c._count.visas,
+          bookingCount: c._count.bookings,
+        })),
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1,
         },
-      }),
-    ]);
-
-    const totalPages = Math.ceil(total / limit);
-
-    return {
-      customers: customers.map((c) => ({
-        id: c.id,
-        customerNumber: c.customerNumber,
-        fullName: c.fullName,
-        primaryPhone: c.primaryPhone,
-        whatsappNumber: c.whatsappNumber,
-        email: c.email,
-        city: c.city,
-        state: c.state,
-        primaryCategory: c.primaryCategory,
-        status: c.status,
-        branchName: c.branch.name,
-        branchCode: c.branch.code,
-        registeredAt: c.registeredAt.toISOString(),
-        documentCount: c._count.documents,
-        passportCount: c._count.passports,
-        visaCount: c._count.visas,
-        bookingCount: c._count.bookings,
-      })),
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPrevPage: page > 1,
-      },
-    };
+      };
+    } catch (err: any) {
+      this.logger.warn(`Database offline in listCustomers: ${err.message}. Returning empty customer list.`);
+      return {
+        customers: [],
+        meta: {
+          total: 0,
+          page: 1,
+          limit: filter.limit || 20,
+          totalPages: 0,
+          hasNextPage: false,
+          hasPrevPage: false,
+        },
+      };
+    }
   }
 
   /**

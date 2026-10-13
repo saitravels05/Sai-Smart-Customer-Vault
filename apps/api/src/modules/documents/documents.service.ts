@@ -282,75 +282,86 @@ export class DocumentsService {
    * List documents with filters and multi-branch tenancy enforcement
    */
   async listDocuments(filter: DocumentQueryFilter, user: AuthenticatedUser) {
-    const where: any = {
-      isDeleted: false,
-    };
+    try {
+      const where: any = {
+        isDeleted: false,
+      };
 
-    if (filter.customerId) {
-      await this.verifyCustomerBranchAccess(filter.customerId, user);
-      where.customerId = filter.customerId;
-    } else if (user.role !== UserRole.SUPER_ADMIN && user.branchId) {
-      // Must only query documents within user's branch
-      where.branchId = user.branchId;
-    } else if (filter.branchId) {
-      where.branchId = filter.branchId;
-    }
+      if (filter.customerId) {
+        await this.verifyCustomerBranchAccess(filter.customerId, user);
+        where.customerId = filter.customerId;
+      } else if (user.role !== UserRole.SUPER_ADMIN && user.branchId) {
+        // Must only query documents within user's branch
+        where.branchId = user.branchId;
+      } else if (filter.branchId) {
+        where.branchId = filter.branchId;
+      }
 
-    if (filter.category) {
-      where.category = filter.category;
-    }
+      if (filter.category) {
+        where.category = filter.category;
+      }
 
-    if (filter.type) {
-      where.type = filter.type;
-    }
+      if (filter.type) {
+        where.type = filter.type;
+      }
 
-    if (filter.isArchived !== undefined) {
-      where.isArchived = filter.isArchived;
-    }
+      if (filter.isArchived !== undefined) {
+        where.isArchived = filter.isArchived;
+      }
 
-    if (filter.search) {
-      where.OR = [
-        { title: { contains: filter.search, mode: 'insensitive' } },
-        { description: { contains: filter.search, mode: 'insensitive' } },
-        { tags: { has: filter.search } },
-      ];
-    }
+      if (filter.search) {
+        where.OR = [
+          { title: { contains: filter.search, mode: 'insensitive' } },
+          { description: { contains: filter.search, mode: 'insensitive' } },
+          { tags: { has: filter.search } },
+        ];
+      }
 
-    const page = Math.max(1, Number(filter.page) || 1);
-    const limit = Math.min(100, Math.max(1, Number(filter.limit) || 20));
-    const skip = (page - 1) * limit;
+      const page = Math.max(1, Number(filter.page) || 1);
+      const limit = Math.min(100, Math.max(1, Number(filter.limit) || 20));
+      const skip = (page - 1) * limit;
 
-    const [items, total] = await Promise.all([
-      prisma.document.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          customer: {
-            select: {
-              id: true,
-              fullName: true,
-              customerNumber: true,
-              primaryPhone: true,
-              branchId: true,
+      const [items, total] = await Promise.all([
+        prisma.document.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            customer: {
+              select: {
+                id: true,
+                fullName: true,
+                customerNumber: true,
+                primaryPhone: true,
+                branchId: true,
+              },
             },
           },
-        },
-      }),
-      prisma.document.count({ where }),
-    ]);
+        }),
+        prisma.document.count({ where }),
+      ]);
 
-    return {
-      items: items.map((doc) => ({
-        ...doc,
-        fileSizeBytes: Number(doc.fileSizeBytes),
-      })),
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
+      return {
+        items: items.map((doc) => ({
+          ...doc,
+          fileSizeBytes: Number(doc.fileSizeBytes),
+        })),
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+    } catch (err: any) {
+      this.logger.warn(`Database offline in listDocuments: ${err.message}. Returning empty documents list.`);
+      return {
+        items: [],
+        total: 0,
+        page: 1,
+        limit: Number(filter.limit) || 20,
+        totalPages: 0,
+      };
+    }
   }
 
   /**

@@ -57,18 +57,18 @@ export default function DashboardPage() {
       if (statsRes.status === 'fulfilled' && (statsRes.value as any)?.data) {
         setKpis((statsRes.value as any).data);
       } else {
-        // Fallback default state
+        // Fresh application baseline (0 dummy records)
         setKpis({
-          totalCustomers: 248,
-          newCustomersThisMonth: 18,
-          activeCustomers: 242,
-          totalDocuments: 612,
-          pendingAiDocuments: 3,
-          expiringPassports180Days: 14,
-          expiringVisas90Days: 9,
-          upcomingTravelDepartures: 12,
-          totalStorageBytes: 157286400,
-          totalStorageFormatted: '150.0 MB',
+          totalCustomers: 0,
+          newCustomersThisMonth: 0,
+          activeCustomers: 0,
+          totalDocuments: 0,
+          pendingAiDocuments: 0,
+          expiringPassports180Days: 0,
+          expiringVisas90Days: 0,
+          upcomingTravelDepartures: 0,
+          totalStorageBytes: 0,
+          totalStorageFormatted: '0 MB',
           activeBranchesCount: 2,
         });
       }
@@ -76,69 +76,62 @@ export default function DashboardPage() {
       if (analyticsRes.status === 'fulfilled' && (analyticsRes.value as any)?.data) {
         setAnalytics((analyticsRes.value as any).data);
       } else {
-        // Fallback default state
+        // Fresh application baseline (0 dummy records)
         setAnalytics({
           kpis: {
-            totalCustomers: 248,
-            newCustomersThisMonth: 18,
-            activeCustomers: 242,
-            totalDocuments: 612,
-            pendingAiDocuments: 3,
-            expiringPassports180Days: 14,
-            expiringVisas90Days: 9,
-            upcomingTravelDepartures: 12,
-            totalStorageBytes: 157286400,
-            totalStorageFormatted: '150.0 MB',
+            totalCustomers: 0,
+            newCustomersThisMonth: 0,
+            activeCustomers: 0,
+            totalDocuments: 0,
+            pendingAiDocuments: 0,
+            expiringPassports180Days: 0,
+            expiringVisas90Days: 0,
+            upcomingTravelDepartures: 0,
+            totalStorageBytes: 0,
+            totalStorageFormatted: '0 MB',
             activeBranchesCount: 2,
           },
           monthlyRegistrations: [
-            { month: 'May', count: 24 },
-            { month: 'Jun', count: 31 },
-            { month: 'Jul', count: 38 },
-            { month: 'Aug', count: 42 },
-            { month: 'Sep', count: 47 },
-            { month: 'Oct', count: 18 },
+            { month: 'May', count: 0 },
+            { month: 'Jun', count: 0 },
+            { month: 'Jul', count: 0 },
+            { month: 'Aug', count: 0 },
+            { month: 'Sep', count: 0 },
+            { month: 'Oct', count: 0 },
           ],
           serviceCategoryBreakdown: [
-            { category: 'Passport Services', count: 98, percentage: 39.5 },
-            { category: 'Visa Processing', count: 72, percentage: 29.0 },
-            { category: 'Flight Tickets', count: 54, percentage: 21.8 },
-            { category: 'Tour Packages', count: 24, percentage: 9.7 },
+            { category: 'Passport Services', count: 0, percentage: 0 },
+            { category: 'Visa Processing', count: 0, percentage: 0 },
+            { category: 'Flight Tickets', count: 0, percentage: 0 },
+            { category: 'Tour Packages', count: 0, percentage: 0 },
           ],
           branchActivity: [
             {
               branchId: 'madurai-ho',
               branchCode: 'IXM-HO',
               branchName: 'Madurai Head Office',
-              customerCount: 164,
-              documentCount: 418,
+              customerCount: 0,
+              documentCount: 0,
             },
             {
               branchId: 'trichy-bo',
               branchCode: 'TRZ-BO',
               branchName: 'Trichy Branch Office',
-              customerCount: 84,
-              documentCount: 194,
+              customerCount: 0,
+              documentCount: 0,
             },
           ],
-          documentTypeBreakdown: [
-            { type: 'Passport', count: 210 },
-            { type: 'Visa', count: 145 },
-            { type: 'Flight Ticket', count: 102 },
-            { type: 'Aadhaar Card', count: 88 },
-            { type: 'PAN Card', count: 45 },
-            { type: 'Photo', count: 22 },
-          ],
+          documentTypeBreakdown: [],
           expiryUrgencyBreakdown: {
-            critical7d: 5,
-            urgent30d: 9,
-            warning180d: 14,
-            expired: 2,
+            critical7d: 0,
+            urgent30d: 0,
+            warning180d: 0,
+            expired: 0,
           },
           repeatCustomerStats: {
-            singleServiceCount: 154,
-            multiServiceCount: 94,
-            repeatCustomerRate: 37.9,
+            singleServiceCount: 0,
+            multiServiceCount: 0,
+            repeatCustomerRate: 0,
           },
         });
       }
@@ -414,7 +407,7 @@ export default function DashboardPage() {
             </div>
           </div>
           <p className="text-2xl font-black text-indigo-700">
-            {analytics?.repeatCustomerStats?.repeatCustomerRate ?? 37.9}%
+            {analytics?.repeatCustomerStats?.repeatCustomerRate ?? 0}%
           </p>
           <p className="text-[11px] text-slate-500 mt-1">
             Multi-service repeat clients
@@ -445,7 +438,7 @@ export default function DashboardPage() {
           <div className="pt-4">
             <div className="h-44 flex items-end justify-between gap-3 px-2">
               {analytics?.monthlyRegistrations?.map((item, idx) => {
-                const heightPercent = Math.max(12, Math.round((item.count / maxMonthlyCount) * 100));
+                const heightPercent = item.count === 0 ? 0 : Math.max(12, Math.round((item.count / maxMonthlyCount) * 100));
                 const isCurrent = idx === (analytics.monthlyRegistrations.length - 1);
                 return (
                   <div key={item.month} className="flex-1 flex flex-col items-center gap-2 group">
@@ -524,7 +517,9 @@ export default function DashboardPage() {
 
           <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
             <span>Primary Focus:</span>
-            <span className="font-semibold text-slate-700">Passports & Visas (68.5%)</span>
+            <span className="font-semibold text-slate-700">
+              {kpis && kpis.totalCustomers > 0 ? 'Active Services' : 'Fresh System Ready'}
+            </span>
           </div>
         </div>
       </div>
@@ -587,23 +582,31 @@ export default function DashboardPage() {
           </div>
 
           <div className="space-y-2.5">
-            {analytics?.documentTypeBreakdown?.map((doc) => {
-              const pct = Number(((doc.count / totalDocs) * 100).toFixed(1));
-              return (
-                <div key={doc.type} className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-slate-400" />
-                    <span className="text-slate-700 font-medium">
-                      {doc.type}
-                    </span>
+            {(!analytics?.documentTypeBreakdown || analytics.documentTypeBreakdown.length === 0) ? (
+              <div className="p-4 text-center text-slate-400 space-y-1">
+                <FileText className="w-5 h-5 mx-auto text-slate-300" />
+                <p className="text-xs font-medium">0 documents in vault</p>
+                <p className="text-[10px] text-slate-400">Vault ready for encrypted uploads</p>
+              </div>
+            ) : (
+              analytics.documentTypeBreakdown.map((doc) => {
+                const pct = Number(((doc.count / totalDocs) * 100).toFixed(1));
+                return (
+                  <div key={doc.type} className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-slate-400" />
+                      <span className="text-slate-700 font-medium">
+                        {doc.type}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-900">{doc.count}</span>
+                      <span className="text-[10px] text-slate-400 w-10 text-right">({pct}%)</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-900">{doc.count}</span>
-                    <span className="text-[10px] text-slate-400 w-10 text-right">({pct}%)</span>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
 
           <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-500">
@@ -633,7 +636,7 @@ export default function DashboardPage() {
                 <span className="text-xs font-semibold text-slate-700">Critical (&lt;7 Days)</span>
               </div>
               <span className="text-sm font-black text-slate-900">
-                {analytics?.expiryUrgencyBreakdown?.critical7d ?? 5} alerts
+                {analytics?.expiryUrgencyBreakdown?.critical7d ?? 0} alerts
               </span>
             </div>
 
@@ -643,7 +646,7 @@ export default function DashboardPage() {
                 <span className="text-xs font-semibold text-slate-700">Urgent (7-30 Days)</span>
               </div>
               <span className="text-sm font-black text-slate-900">
-                {analytics?.expiryUrgencyBreakdown?.urgent30d ?? 9} alerts
+                {analytics?.expiryUrgencyBreakdown?.urgent30d ?? 0} alerts
               </span>
             </div>
 
@@ -653,7 +656,7 @@ export default function DashboardPage() {
                 <span className="text-xs font-semibold text-slate-700">Warning (30-180 Days)</span>
               </div>
               <span className="text-sm font-black text-slate-900">
-                {analytics?.expiryUrgencyBreakdown?.warning180d ?? 14} alerts
+                {analytics?.expiryUrgencyBreakdown?.warning180d ?? 0} alerts
               </span>
             </div>
           </div>
@@ -663,11 +666,11 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between text-xs mb-1">
               <span className="font-semibold text-slate-700">Client Repeat Retention:</span>
               <span className="font-black text-indigo-700">
-                {analytics?.repeatCustomerStats?.repeatCustomerRate ?? 37.9}%
+                {analytics?.repeatCustomerStats?.repeatCustomerRate ?? 0}%
               </span>
             </div>
             <p className="text-[11px] text-slate-500 leading-normal">
-              {analytics?.repeatCustomerStats?.multiServiceCount ?? 94} customers have engaged in multiple travel services.
+              {analytics?.repeatCustomerStats?.multiServiceCount ?? 0} customers have engaged in multiple travel services.
             </p>
           </div>
         </div>
