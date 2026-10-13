@@ -76,13 +76,13 @@ export class SearchService {
           entityType: 'PASSPORT',
           title: `Passport: ${p.customer.fullName} (${p.customer.customerNumber})`,
           subtitle: `Expires in ${daysLeft} days • Valid until ${new Date(p.expiryDate).toISOString().split('T')[0]}`,
-          snippet: `Issued at ${p.placeOfIssue || 'India'} (${p.nationality || 'Indian'}). Action recommended: Notify customer for renewal.`,
+          snippet: `Issued at ${p.placeOfIssue || 'India'} (${p.issuingCountry || 'IND'}). Action recommended: Notify customer for renewal.`,
           customerId: p.customer.id,
           customerNumber: p.customer.customerNumber,
           branchId: p.customer.branchId,
           branchName: branchMap.get(p.customer.branchId) || 'Branch Office',
           relevanceScore: 0.95,
-          deepLink: `/customers/${p.customer.id}?tab=travel`,
+          deepLink: `/customers/${p.customer.id}?tab=credentials`,
           metadata: {
             daysUntilExpiry: daysLeft,
             expiryDate: p.expiryDate,
@@ -101,7 +101,7 @@ export class SearchService {
       const pHash = hashSearchField(intent.detectedEntities.passportNumber);
       const passportMatches = await prisma.passport.findMany({
         where: {
-          passportNumberHash: pHash,
+          passportHash: pHash,
           customer: {
             ...customerBranchWhere,
             isDeleted: false,
@@ -119,14 +119,14 @@ export class SearchService {
           id: p.id,
           entityType: 'PASSPORT',
           title: `Passport Record: ${maskPassportNumber(intent.detectedEntities.passportNumber!)} — ${p.customer.fullName}`,
-          subtitle: `Customer: ${p.customer.customerNumber} • Nationality: ${p.nationality || 'Indian'}`,
+          subtitle: `Customer: ${p.customer.customerNumber} • Country: ${p.issuingCountry || 'IND'}`,
           snippet: `Exact passport match. Valid until ${new Date(p.expiryDate).toISOString().split('T')[0]}.`,
           customerId: p.customer.id,
           customerNumber: p.customer.customerNumber,
           branchId: p.customer.branchId,
           branchName: branchMap.get(p.customer.branchId) || 'Branch Office',
           relevanceScore: 1.0,
-          deepLink: `/customers/${p.customer.id}?tab=travel`,
+          deepLink: `/customers/${p.customer.id}?tab=credentials`,
         });
       }
     }
@@ -156,15 +156,15 @@ export class SearchService {
         items.push({
           id: v.id,
           entityType: 'VISA',
-          title: `${v.country} Visa (${v.visaType}): ${v.customer.fullName}`,
-          subtitle: `Customer: ${v.customer.customerNumber} • Valid: ${v.validFrom ? new Date(v.validFrom).toISOString().split('T')[0] : 'N/A'} to ${new Date(v.validUntil).toISOString().split('T')[0]}`,
-          snippet: `Status: ${v.status} • Entry: ${v.entryType}`,
+          title: `${v.country} Visa (${v.visaCategory}): ${v.customer.fullName}`,
+          subtitle: `Customer: ${v.customer.customerNumber} • Valid: ${v.issueDate ? new Date(v.issueDate).toISOString().split('T')[0] : 'N/A'} to ${new Date(v.expiryDate).toISOString().split('T')[0]}`,
+          snippet: `Status: ${v.status} • Entry: ${v.entriesPermitted}`,
           customerId: v.customer.id,
           customerNumber: v.customer.customerNumber,
           branchId: v.customer.branchId,
           branchName: branchMap.get(v.customer.branchId) || 'Branch Office',
           relevanceScore: 0.9,
-          deepLink: `/customers/${v.customer.id}?tab=travel`,
+          deepLink: `/customers/${v.customer.id}?tab=credentials`,
         });
       }
 
@@ -172,8 +172,10 @@ export class SearchService {
       const bookingMatches = await prisma.travelBooking.findMany({
         where: {
           OR: [
-            { destination: { contains: dest, mode: 'insensitive' } },
-            { origin: { contains: dest, mode: 'insensitive' } },
+            { destAirport: { contains: dest, mode: 'insensitive' } },
+            { originAirport: { contains: dest, mode: 'insensitive' } },
+            { hotelName: { contains: dest, mode: 'insensitive' } },
+            { airline: { contains: dest, mode: 'insensitive' } },
           ],
           customer: {
             ...customerBranchWhere,
@@ -189,12 +191,13 @@ export class SearchService {
       });
 
       for (const b of bookingMatches) {
+        const route = b.flightNumber ? `${b.airline || 'Flight'} ${b.flightNumber} (${b.originAirport || ''} ➔ ${b.destAirport || ''})` : (b.hotelName || 'Booking');
         items.push({
           id: b.id,
           entityType: 'TRAVEL_BOOKING',
-          title: `${b.bookingType}: ${b.origin} ➔ ${b.destination} (${b.customer.fullName})`,
-          subtitle: `Booking Ref: ${b.bookingReference || 'N/A'} • Carrier: ${b.airlineOrCarrier || 'Scheduled Flight'}`,
-          snippet: `Travel Date: ${b.travelDate ? new Date(b.travelDate).toISOString().split('T')[0] : 'TBD'} • Status: ${b.status}`,
+          title: `Booking: ${route} (${b.customer.fullName})`,
+          subtitle: `Booking Ref: ${b.bookingRef} • PNR: ${b.pnr || 'N/A'} • Carrier: ${b.airline || 'Scheduled Flight'}`,
+          snippet: `Departure: ${b.departureTime ? new Date(b.departureTime).toISOString().split('T')[0] : (b.checkInDate ? new Date(b.checkInDate).toISOString().split('T')[0] : 'TBD')}`,
           customerId: b.customer.id,
           customerNumber: b.customer.customerNumber,
           branchId: b.customer.branchId,
@@ -303,7 +306,7 @@ export class SearchService {
         items.push({
           id: d.id,
           entityType: 'DOCUMENT',
-          title: `${d.title} [${d.documentType}]`,
+          title: `${d.title} [${d.type}]`,
           subtitle: `Customer: ${d.customer.fullName} (${d.customer.customerNumber}) • Size: ${(Number(d.fileSizeBytes) / 1024).toFixed(1)} KB`,
           snippet: `Category: ${d.category} • Uploaded on ${new Date(d.createdAt).toISOString().split('T')[0]}`,
           customerId: d.customer.id,
@@ -325,11 +328,12 @@ export class SearchService {
     try {
       await prisma.auditLog.create({
         data: {
-          userId: user.userId,
-          branchId: user.branchId,
+          userId: user.userId || undefined,
+          branchId: user.branchId || undefined,
           action: 'SMART_SEARCH_EXECUTED',
           entityType: 'SEARCH_QUERY',
           entityId: query.slice(0, 100),
+          ipAddress: '127.0.0.1',
           newStateJson: {
             query,
             intent: intent.intentType,

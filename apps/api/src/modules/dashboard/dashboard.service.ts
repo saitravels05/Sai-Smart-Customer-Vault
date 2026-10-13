@@ -56,7 +56,7 @@ export class DashboardService {
       prisma.customer.count({ where: { ...branchWhere, isDeleted: false } }),
       prisma.customer.count({ where: { ...branchWhere, isDeleted: false, registeredAt: { gte: startOfMonth } } }),
       prisma.customer.count({ where: { ...branchWhere, isDeleted: false, status: 'ACTIVE' } }),
-      prisma.document.count({ where: { ...branchCustomerWhere, isCurrentVersion: true } }),
+      prisma.document.count({ where: { ...branchCustomerWhere, isDeleted: false } }),
       prisma.aIProcessingJob.count({ where: { status: { in: ['PENDING', 'PROCESSING'] } } }),
       prisma.passport.count({
         where: {
@@ -66,18 +66,18 @@ export class DashboardService {
       }),
       prisma.visa.count({
         where: {
-          validUntil: { lte: horizon90Days, gte: now },
+          expiryDate: { lte: horizon90Days, gte: now },
           customer: { ...branchWhere, isDeleted: false },
         },
       }),
       prisma.travelBooking.count({
         where: {
-          travelDate: { gte: now, lte: horizon7Days },
+          departureTime: { gte: now, lte: horizon7Days },
           customer: { ...branchWhere, isDeleted: false },
         },
       }),
       prisma.document.aggregate({
-        where: { ...branchCustomerWhere, isCurrentVersion: true },
+        where: { ...branchCustomerWhere, isDeleted: false },
         _sum: { fileSizeBytes: true },
       }),
       prisma.branch.count({ where: { isActive: true } }),
@@ -159,7 +159,7 @@ export class DashboardService {
     const branchActivity: BranchActivityStat[] = [];
     for (const b of branches) {
       const docCount = await prisma.document.count({
-        where: { customer: { branchId: b.id }, isCurrentVersion: true },
+        where: { customer: { branchId: b.id }, isDeleted: false },
       });
       branchActivity.push({
         branchId: b.id,
@@ -171,15 +171,23 @@ export class DashboardService {
     }
 
     // 4. Document Type Breakdown
-    const docGroups = await prisma.document.groupBy({
-      by: ['documentType'],
-      where: { ...branchCustomerWhere, isCurrentVersion: true },
-      _count: { _all: true },
+    const docs = await prisma.document.findMany({
+      where: {
+        isDeleted: false,
+        ...(user.role === UserRole.SUPER_ADMIN ? {} : { customer: { branchId: user.branchId } }),
+      },
+      select: { type: true },
     });
 
-    const documentTypeBreakdown: DocumentTypeStat[] = docGroups.map((d) => ({
-      type: d.documentType.replace(/_/g, ' '),
-      count: d._count._all,
+    const typeCountMap: Record<string, number> = {};
+    for (const d of docs) {
+      const t = d.type.replace(/_/g, ' ');
+      typeCountMap[t] = (typeCountMap[t] || 0) + 1;
+    }
+
+    const documentTypeBreakdown: DocumentTypeStat[] = Object.entries(typeCountMap).map(([type, count]) => ({
+      type,
+      count,
     }));
 
     // 5. Expiry Urgency Breakdown

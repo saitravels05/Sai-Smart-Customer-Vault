@@ -101,7 +101,7 @@ export class RemindersService {
 
     const visas = await prisma.visa.findMany({
       where: {
-        validUntil: { lte: horizon90Days },
+        expiryDate: { lte: horizon90Days },
         customer: { isDeleted: false },
       },
       include: {
@@ -113,14 +113,14 @@ export class RemindersService {
 
     for (const v of visas) {
       scannedCount++;
-      const { daysLeft } = ReminderCalculator.calculateSeverity(v.validUntil);
+      const { daysLeft } = ReminderCalculator.calculateSeverity(v.expiryDate);
       const leadDay = ReminderCalculator.matchLeadDay(daysLeft) || (daysLeft < 0 ? 0 : 90);
 
       const existing = await prisma.reminder.findFirst({
         where: {
           customerId: v.customer.id,
           type: ReminderType.VISA_EXPIRY,
-          targetDate: v.validUntil,
+          targetDate: v.expiryDate,
           leadDays: leadDay,
         },
       });
@@ -133,9 +133,9 @@ export class RemindersService {
       const { title, message } = ReminderCalculator.generateMessage(
         ReminderType.VISA_EXPIRY,
         v.customer.fullName,
-        v.validUntil,
+        v.expiryDate,
         daysLeft,
-        { country: v.country, visaType: v.visaType },
+        { country: v.country, visaType: v.visaCategory },
       );
 
       const hasConsent = await WhatsAppNotifier.hasWhatsAppConsent(v.customer.id);
@@ -148,7 +148,7 @@ export class RemindersService {
           channel,
           title,
           message,
-          targetDate: v.validUntil,
+          targetDate: v.expiryDate,
           leadDays: leadDay,
           scheduledFor: new Date(),
           status: ReminderStatus.SCHEDULED,
@@ -164,7 +164,7 @@ export class RemindersService {
 
     const bookings = await prisma.travelBooking.findMany({
       where: {
-        travelDate: { gte: now, lte: horizon7Days },
+        departureTime: { gte: now, lte: horizon7Days },
         customer: { isDeleted: false },
       },
       include: {
@@ -175,16 +175,16 @@ export class RemindersService {
     });
 
     for (const b of bookings) {
-      if (!b.travelDate) continue;
+      if (!b.departureTime) continue;
       scannedCount++;
-      const { daysLeft } = ReminderCalculator.calculateSeverity(b.travelDate);
+      const { daysLeft } = ReminderCalculator.calculateSeverity(b.departureTime);
       const leadDay = daysLeft <= 1 ? 1 : 7;
 
       const existing = await prisma.reminder.findFirst({
         where: {
           customerId: b.customer.id,
           type: ReminderType.UPCOMING_FLIGHT_DEPARTURE,
-          targetDate: b.travelDate,
+          targetDate: b.departureTime,
           leadDays: leadDay,
         },
       });
@@ -197,9 +197,9 @@ export class RemindersService {
       const { title, message } = ReminderCalculator.generateMessage(
         ReminderType.UPCOMING_FLIGHT_DEPARTURE,
         b.customer.fullName,
-        b.travelDate,
+        b.departureTime,
         daysLeft,
-        { route: `${b.origin} -> ${b.destination}`, carrier: b.airlineOrCarrier },
+        { route: `${b.originAirport || ''} -> ${b.destAirport || ''}`, carrier: b.airline || 'Scheduled Flight' },
       );
 
       await prisma.reminder.create({
@@ -209,7 +209,7 @@ export class RemindersService {
           channel: ReminderChannel.WHATSAPP,
           title,
           message,
-          targetDate: b.travelDate,
+          targetDate: b.departureTime,
           leadDays: leadDay,
           scheduledFor: new Date(),
           status: ReminderStatus.SCHEDULED,
@@ -286,14 +286,14 @@ export class RemindersService {
         branchName: branchMap.get(r.customer.branchId) || 'Branch Office',
         primaryPhone: r.customer.primaryPhone,
         whatsappNumber: r.customer.whatsappNumber || undefined,
-        type: r.type,
-        channel: r.channel,
+        type: r.type as any,
+        channel: r.channel as any,
         title: r.title,
         message: r.message,
         targetDate: new Date(r.targetDate).toISOString().split('T')[0],
         leadDays: r.leadDays,
         scheduledFor: r.scheduledFor.toISOString(),
-        status: r.status,
+        status: r.status as any,
         sentAt: r.sentAt?.toISOString(),
         acknowledgedAt: r.acknowledgedAt?.toISOString(),
         failureReason: r.failureReason || undefined,
@@ -387,14 +387,14 @@ export class RemindersService {
       branchName: 'Branch Office',
       primaryPhone: updated.customer.primaryPhone,
       whatsappNumber: updated.customer.whatsappNumber || undefined,
-      type: updated.type,
-      channel: updated.channel,
+      type: updated.type as any,
+      channel: updated.channel as any,
       title: updated.title,
       message: updated.message,
       targetDate: new Date(updated.targetDate).toISOString().split('T')[0],
       leadDays: updated.leadDays,
       scheduledFor: updated.scheduledFor.toISOString(),
-      status: updated.status,
+      status: updated.status as any,
       acknowledgedAt: updated.acknowledgedAt?.toISOString(),
       daysUntilTarget: daysLeft,
       severity,
@@ -483,11 +483,12 @@ export class RemindersService {
     try {
       await prisma.auditLog.create({
         data: {
-          userId: user.userId,
-          branchId: user.branchId,
+          userId: user.userId || undefined,
+          branchId: user.branchId || undefined,
           action,
           entityType: 'REMINDER',
           entityId,
+          ipAddress: '127.0.0.1',
         },
       });
     } catch (e: any) {

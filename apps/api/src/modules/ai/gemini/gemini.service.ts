@@ -63,7 +63,7 @@ export class GeminiDocumentAiService {
     const prompt = this.getPromptForDocType(docType);
     const base64Data = fileBuffer.toString('base64');
 
-    const interaction = await this.client!.interactions.create({
+    const interaction = await (this.client as any).interactions.create({
       model: this.modelName,
       input: [
         {
@@ -83,9 +83,9 @@ export class GeminiDocumentAiService {
       ],
       systemInstruction:
         'You are an expert AI Travel Document Intelligence Engine for SAI Tours & Travels. Extract real data accurately into valid JSON. Return ONLY the JSON object. Do not wrap in markdown quotes if possible.',
-    });
+    } as any);
 
-    const rawText = interaction.output_text || '{}';
+    const rawText = (interaction as any).output_text || '{}';
     let parsed: any = {};
 
     try {

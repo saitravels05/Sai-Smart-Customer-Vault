@@ -1,15 +1,15 @@
 import { Controller, Post, Get, Body, UseGuards } from '@nestjs/common';
 import { AssistantService } from './assistant.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AskAssistantDto } from '@sai/shared-types';
 
-@Controller('v1/assistant')
-@UseGuards(JwtAuthGuard)
+@Controller('assistant')
 export class AssistantController {
   constructor(private readonly assistantService: AssistantService) {}
 
   @Post('chat')
+  @UseGuards(JwtAuthGuard)
   async chat(@Body() dto: AskAssistantDto, @CurrentUser() user?: any) {
     const userContext = {
       userId: user?.id || user?.userId || 'system-staff',

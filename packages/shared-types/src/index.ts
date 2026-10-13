@@ -9,5 +9,6 @@ export * from './assistant.dto.js';
 export * from './reminder.dto.js';
 export * from './dashboard.dto.js';
 export * from './branch.dto.js';
+export * from './localization.js';
 
 

@@ -9,9 +9,9 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { BranchTenantGuard } from '../auth/guards/branch-tenant.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { BranchTenantGuard } from '../../common/guards/branch-tenant.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AiService, AuthenticatedUser } from './ai.service';
 import { VerifyAiResultDto, verifyAiResultSchema } from '@sai/shared-types';
 
@@ -27,7 +27,7 @@ export class AiController {
   async triggerExtraction(
     @Param('documentId') documentId: string,
     @CurrentUser() user: AuthenticatedUser,
-  ) {
+  ): Promise<any> {
     const result = await this.aiService.triggerExtraction(documentId, user);
     return {
       statusCode: HttpStatus.OK,
@@ -41,7 +41,7 @@ export class AiController {
   async getJobResult(
     @Param('jobId') jobId: string,
     @CurrentUser() user: AuthenticatedUser,
-  ) {
+  ): Promise<any> {
     const result = await this.aiService.getExtractionByJobId(jobId, user);
     return {
       statusCode: HttpStatus.OK,
@@ -54,7 +54,7 @@ export class AiController {
   async getLatestExtraction(
     @Param('documentId') documentId: string,
     @CurrentUser() user: AuthenticatedUser,
-  ) {
+  ): Promise<any> {
     const result = await this.aiService.getLatestExtractionForDocument(documentId, user);
     return {
       statusCode: HttpStatus.OK,
@@ -67,7 +67,7 @@ export class AiController {
   async verifyAndApply(
     @Body() body: any,
     @CurrentUser() user: AuthenticatedUser,
-  ) {
+  ): Promise<any> {
     const parsed = verifyAiResultSchema.safeParse(body);
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.errors[0]?.message || 'Invalid verification payload.');

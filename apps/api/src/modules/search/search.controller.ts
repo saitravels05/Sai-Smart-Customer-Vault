@@ -1,11 +1,11 @@
 import { Controller, Get, Post, Query, Body, UseGuards } from '@nestjs/common';
 import { SearchService } from './search.service';
 import { SearchIntentParser } from './search-intent-parser';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SmartSearchQueryDto, DocumentType, ServiceCategory } from '@sai/shared-types';
 
-@Controller('v1/search')
+@Controller('search')
 @UseGuards(JwtAuthGuard)
 export class SearchController {
   constructor(private readonly searchService: SearchService) {}

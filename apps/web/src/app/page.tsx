@@ -31,8 +31,10 @@ import {
   DashboardAnalyticsDto,
 } from '@sai/shared-types';
 import { apiClient } from '@/lib/api-client';
+import { useLanguage } from '@/context/language-context';
 
 export default function DashboardPage() {
+  const { t, isTamil, formatDateLocalized } = useLanguage();
   const [kpis, setKpis] = useState<ExecutiveDashboardKpisDto | null>(null);
   const [analytics, setAnalytics] = useState<DashboardAnalyticsDto | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -159,32 +161,34 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* Executive Command Banner */}
-      <div className="bg-gradient-to-r from-[#0B192C] via-[#1E3E62] to-[#0B192C] rounded-2xl p-6 text-white shadow-xl relative overflow-hidden border border-slate-800">
+      <div className="bg-gradient-to-r from-[#0B192C] via-[#1E3E62] to-[#0B192C] rounded-2xl p-4 sm:p-6 text-white shadow-xl relative overflow-hidden border border-slate-800">
         <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-orange-500/15 via-transparent to-transparent pointer-events-none" />
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-2">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-500/20 border border-orange-500/30 text-orange-300 text-[11px] font-semibold">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                <span>EXECUTIVE OPERATIONS VAULT</span>
+                <span>{isTamil ? 'தலைமைச் செயல்பாட்டுப் பலகை' : 'EXECUTIVE OPERATIONS VAULT'}</span>
               </span>
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[11px] font-medium">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>Live PostgreSQL Telemetry</span>
+                <span>{isTamil ? 'நேரடித் தரவு இணைப்பு' : 'Live PostgreSQL Telemetry'}</span>
               </span>
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-300 text-[11px] font-medium">
                 <span>DPDPA 2023 Compliant</span>
               </span>
             </div>
             <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
-              SAI TOURS & TRAVELS
+              {isTamil ? 'சாய் டூர்ஸ் & டிராவல்ஸ்' : 'SAI TOURS & TRAVELS'}
             </h1>
             <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
-              Madurai Head Office & Trichy Branch Customer CRM, Document Vault & Statutory Compliance Hub. Real-time metrics calculated directly from database records.
+              {isTamil
+                ? 'மதுரை தலைமை அலுவலகம் (+91 9894821561) & திருச்சி கிளை (+91 9894619921) வாடிக்கையாளர் நிர்வாகம் & பாதுகாக்கப்பட்ட ஆவணக் களஞ்சியம்.'
+                : 'Madurai Head Office (+91 9894821561) & Trichy Branch (+91 9894619921) Customer CRM, Document Vault & Statutory Compliance Hub.'}
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <button
               onClick={fetchDashboardData}
               disabled={loading}
@@ -192,21 +196,21 @@ export default function DashboardPage() {
               title="Refresh database metrics"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-              <span>Refresh</span>
+              <span>{isTamil ? 'புதுப்பி' : 'Refresh'}</span>
             </button>
             <Link
               href="/customers/new"
               className="inline-flex items-center gap-2 bg-[#E85A18] hover:bg-[#D44E0F] text-white px-4 py-2 rounded-xl text-xs font-semibold shadow-md hover:shadow-lg transition"
             >
               <Users className="w-4 h-4" />
-              <span>+ Register Customer</span>
+              <span>{isTamil ? '+ வாடிக்கையாளர் பதிவு' : '+ Register Customer'}</span>
             </Link>
             <Link
               href="/documents"
               className="inline-flex items-center gap-2 bg-slate-800/90 hover:bg-slate-700 text-white px-4 py-2 rounded-xl text-xs font-medium border border-slate-700 transition"
             >
               <FolderLock className="w-4 h-4 text-orange-400" />
-              <span>Document Vault</span>
+              <span>{isTamil ? 'ஆவணக் களஞ்சியம்' : 'Document Vault'}</span>
             </Link>
           </div>
         </div>
@@ -215,7 +219,7 @@ export default function DashboardPage() {
         <div className="mt-5 pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between text-xs text-slate-300 gap-3">
           <div className="flex items-center gap-2">
             <Building2 className="w-4 h-4 text-orange-400" />
-            <span className="font-medium text-slate-400">Branch Scope:</span>
+            <span className="font-medium text-slate-400">{isTamil ? 'கிளைத் தேர்வு:' : 'Branch Scope:'}</span>
             <div className="inline-flex bg-slate-900/80 p-0.5 rounded-lg border border-slate-700">
               <button
                 onClick={() => setSelectedBranch('ALL')}
@@ -225,7 +229,7 @@ export default function DashboardPage() {
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                All Branches (Global View)
+                {isTamil ? 'அனைத்து கிளைகள்' : 'All Branches'}
               </button>
               <button
                 onClick={() => setSelectedBranch('MADURAI')}
@@ -235,7 +239,7 @@ export default function DashboardPage() {
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                Madurai HO (IXM)
+                {isTamil ? 'மதுரை (HO)' : 'Madurai HO (IXM)'}
               </button>
               <button
                 onClick={() => setSelectedBranch('TRICHY')}
@@ -245,7 +249,7 @@ export default function DashboardPage() {
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                Trichy BO (TRZ)
+                {isTamil ? 'திருச்சி (BO)' : 'Trichy BO (TRZ)'}
               </button>
             </div>
           </div>
@@ -257,11 +261,13 @@ export default function DashboardPage() {
       </div>
 
       {/* 8 Primary Executive KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Total Customers */}
         <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs hover:shadow-md transition">
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold text-slate-600">Total Customers</span>
+            <span className="text-xs font-semibold text-slate-600">
+              {isTamil ? 'மொத்த வாடிக்கையாளர்கள்' : 'Total Customers'}
+            </span>
             <div className="w-7 h-7 rounded-lg bg-orange-50 text-[#E85A18] flex items-center justify-center">
               <Users className="w-4 h-4" />
             </div>
@@ -271,16 +277,18 @@ export default function DashboardPage() {
           </p>
           <div className="flex items-center gap-1.5 mt-1 text-[11px]">
             <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded">
-              +{kpis?.newCustomersThisMonth ?? 0} this month
+              +{kpis?.newCustomersThisMonth ?? 0} {isTamil ? 'இந்த மாதம்' : 'this month'}
             </span>
-            <span className="text-slate-500">live CRM records</span>
+            <span className="text-slate-500">{isTamil ? 'CRM பதிவுகள்' : 'live CRM records'}</span>
           </div>
         </div>
 
         {/* Active Customers */}
         <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs hover:shadow-md transition">
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold text-slate-600">Active Profiles</span>
+            <span className="text-xs font-semibold text-slate-600">
+              {isTamil ? 'செயலில் உள்ள கணக்குகள்' : 'Active Profiles'}
+            </span>
             <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
               <UserCheck className="w-4 h-4" />
             </div>
@@ -289,14 +297,16 @@ export default function DashboardPage() {
             {kpis?.activeCustomers ?? '—'}
           </p>
           <p className="text-[11px] text-slate-500 mt-1">
-            Status: Active & verified clients
+            {isTamil ? 'சரிபார்க்கப்பட்ட வாடிக்கையாளர்கள்' : 'Status: Active & verified clients'}
           </p>
         </div>
 
         {/* Total Stored Documents */}
         <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs hover:shadow-md transition">
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold text-slate-600">Vault Documents</span>
+            <span className="text-xs font-semibold text-slate-600">
+              {isTamil ? 'வால்ட் ஆவணங்கள்' : 'Vault Documents'}
+            </span>
             <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
               <FolderLock className="w-4 h-4" />
             </div>
@@ -306,14 +316,19 @@ export default function DashboardPage() {
           </p>
           <div className="flex items-center gap-1.5 mt-1 text-[11px] text-slate-500">
             <HardDrive className="w-3.5 h-3.5 text-slate-400" />
-            <span>Usage: <strong className="text-slate-700">{kpis?.totalStorageFormatted ?? '0 MB'}</strong></span>
+            <span>
+              {isTamil ? 'சேமிப்பு: ' : 'Usage: '}
+              <strong className="text-slate-700">{kpis?.totalStorageFormatted ?? '0 MB'}</strong>
+            </span>
           </div>
         </div>
 
         {/* Pending AI Documents */}
         <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs hover:shadow-md transition">
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold text-slate-600">AI Review Queue</span>
+            <span className="text-xs font-semibold text-slate-600">
+              {isTamil ? 'AI சரிபார்ப்பு வரிசை' : 'AI Review Queue'}
+            </span>
             <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
               <Sparkles className="w-4 h-4" />
             </div>
@@ -323,7 +338,9 @@ export default function DashboardPage() {
           </p>
           <div className="flex items-center gap-1 mt-1 text-[11px]">
             <span className={`font-semibold ${kpis && kpis.pendingAiDocuments > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-              {kpis && kpis.pendingAiDocuments > 0 ? 'Pending OCR verification' : 'All jobs verified'}
+              {kpis && kpis.pendingAiDocuments > 0
+                ? (isTamil ? 'சரிபார்ப்பு நிலுவையில் உள்ளது' : 'Pending OCR verification')
+                : (isTamil ? 'அனைத்தும் சரிபார்க்கப்பட்டது' : 'All jobs verified')}
             </span>
           </div>
         </div>
@@ -331,7 +348,9 @@ export default function DashboardPage() {
         {/* Expiring Passports (180 Days) */}
         <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs hover:shadow-md transition">
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold text-slate-600">Passports (&lt;180d)</span>
+            <span className="text-xs font-semibold text-slate-600">
+              {isTamil ? 'கடவுச்சீட்டுகள் (<180 நாள்)' : 'Passports (<180d)'}
+            </span>
             <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
               <AlertTriangle className="w-4 h-4" />
             </div>
@@ -340,23 +359,25 @@ export default function DashboardPage() {
             {kpis?.expiringPassports180Days ?? '—'}
           </p>
           <p className="text-[11px] text-slate-500 mt-1">
-            6-Month international rule
+            {isTamil ? 'சர்வதேச 6-மாத விதி' : '6-Month international rule'}
           </p>
         </div>
 
         {/* Expiring Visas (90 Days) */}
         <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs hover:shadow-md transition">
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold text-slate-600">Visas (&lt;90d)</span>
-            <div className="w-7 h-7 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center">
+            <span className="text-xs font-semibold text-slate-600">
+              {isTamil ? 'விசாக்கள் (<90 நாள்)' : 'Visas (<90d)'}
+            </span>
+            <div className="w-7 h-7 rounded-lg bg-red-50 text-red-600 flex items-center justify-center">
               <Clock className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-black text-orange-600">
+          <p className="text-2xl font-black text-red-600">
             {kpis?.expiringVisas90Days ?? '—'}
           </p>
           <p className="text-[11px] text-slate-500 mt-1">
-            Consular renewal window
+            {isTamil ? 'உடனடி புதுப்பித்தல் தேவை' : 'Upcoming expirations'}
           </p>
         </div>
 

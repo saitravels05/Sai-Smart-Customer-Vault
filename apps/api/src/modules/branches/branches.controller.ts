@@ -1,10 +1,10 @@
 import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { BranchesService } from './branches.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateBranchDto, CreateStaffDto } from '@sai/shared-types';
 
-@Controller('v1')
+@Controller()
 @UseGuards(JwtAuthGuard)
 export class BranchesController {
   constructor(private readonly branchesService: BranchesService) {}

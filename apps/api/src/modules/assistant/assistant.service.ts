@@ -67,8 +67,8 @@ export class AssistantService {
         include: {
           passports: true,
           visas: true,
-          bookings: { orderBy: { travelDate: 'desc' } },
-          documents: { where: { isCurrentVersion: true } },
+          bookings: { orderBy: { departureTime: 'desc' } },
+          documents: { where: { isDeleted: false } },
           branch: true,
         },
       });
@@ -115,7 +115,7 @@ PASSPORTS (${customer.passports.length}):
 ${customer.passports
   .map(
     (p) =>
-      `- Expiry: ${new Date(p.expiryDate).toISOString().split('T')[0]}, Nationality: ${p.nationality || 'Indian'}, Place of Issue: ${p.placeOfIssue || 'N/A'}`,
+      `- Expiry: ${new Date(p.expiryDate).toISOString().split('T')[0]}, Country: ${p.issuingCountry || 'IND'}, Place of Issue: ${p.placeOfIssue || 'N/A'}`,
   )
   .join('\n')}
 
@@ -123,7 +123,7 @@ VISAS (${customer.visas.length}):
 ${customer.visas
   .map(
     (v) =>
-      `- Country: ${v.country}, Type: ${v.visaType}, Valid until: ${new Date(v.validUntil).toISOString().split('T')[0]}, Status: ${v.status}`,
+      `- Country: ${v.country}, Category: ${v.visaCategory}, Valid until: ${new Date(v.expiryDate).toISOString().split('T')[0]}, Status: ${v.status}`,
   )
   .join('\n')}
 
@@ -131,12 +131,12 @@ TRAVEL BOOKINGS (${customer.bookings.length}):
 ${customer.bookings
   .map(
     (b) =>
-      `- Type: ${b.bookingType}, Route: ${b.origin} -> ${b.destination}, Carrier: ${b.airlineOrCarrier || 'N/A'}, Date: ${b.travelDate ? new Date(b.travelDate).toISOString().split('T')[0] : 'N/A'}, Ref: ${b.bookingReference || 'N/A'}`,
+      `- Route: ${b.originAirport || ''} -> ${b.destAirport || ''}, Carrier: ${b.airline || 'N/A'}, Departure: ${b.departureTime ? new Date(b.departureTime).toISOString().split('T')[0] : 'N/A'}, Ref: ${b.bookingRef}`,
   )
   .join('\n')}
 
 UPLOADED DOCUMENTS (${customer.documents.length}):
-${customer.documents.map((d) => `- ${d.title} [${d.documentType}] (Uploaded: ${new Date(d.createdAt).toISOString().split('T')[0]})`).join('\n')}
+${customer.documents.map((d) => `- ${d.title} [${d.type}] (Uploaded: ${new Date(d.createdAt).toISOString().split('T')[0]})`).join('\n')}
       `;
 
       // Add documents to sources if mentioned
@@ -146,7 +146,7 @@ ${customer.documents.map((d) => `- ${d.title} [${d.documentType}] (Uploaded: ${n
           entityId: d.id,
           title: d.title,
           link: `/customers/${customer.id}?tab=documents`,
-          details: `Type: ${d.documentType}`,
+          details: `Type: ${d.type}`,
         });
       }
     } else {
@@ -201,7 +201,7 @@ ${customer.documents.map((d) => `- ${d.title} [${d.documentType}] (Uploaded: ${n
           visas
             .map(
               (v) =>
-                `- ${v.customer.fullName} (${v.customer.customerNumber}) - Country: ${v.country} - Status: ${v.status} - Valid until: ${new Date(v.validUntil).toISOString().split('T')[0]} - Branch: ${v.customer.branch.name}`,
+                `- ${v.customer.fullName} (${v.customer.customerNumber}) - Country: ${v.country} - Status: ${v.status} - Valid until: ${new Date(v.expiryDate).toISOString().split('T')[0]} - Branch: ${v.customer.branch.name}`,
             )
             .join('\n');
 
@@ -210,7 +210,7 @@ ${customer.documents.map((d) => `- ${d.title} [${d.documentType}] (Uploaded: ${n
             entityType: 'VISA',
             entityId: v.id,
             title: `${v.country} Visa: ${v.customer.fullName}`,
-            link: `/customers/${v.customer.id}?tab=travel`,
+            link: `/customers/${v.customer.id}?tab=credentials`,
             details: `Status: ${v.status}`,
           });
         }
@@ -260,7 +260,7 @@ Cite customer names, customer numbers, dates, and destinations clearly.
 Remember the strict instructions: Do NOT fabricate records. Redact any sensitive Aadhaar numbers to XXXX-XXXX-1234.
         `;
 
-        const response = await this.client.interactions.create({
+        const response = await (this.client as any).interactions.create({
           model: this.modelName,
           input: prompt,
           systemInstruction:
@@ -286,11 +286,12 @@ Remember the strict instructions: Do NOT fabricate records. Redact any sensitive
     try {
       await prisma.auditLog.create({
         data: {
-          userId: user.userId,
+          userId: user.userId || undefined,
           branchId: user.branchId,
           action: 'AI_CHAT_QUERY',
           entityType: 'ASSISTANT_CONVERSATION',
           entityId: question.slice(0, 100),
+          ipAddress: '127.0.0.1',
           newStateJson: {
             question,
             sourcesCount: sources.length,

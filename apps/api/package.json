@@ -8,7 +8,7 @@
     "dev": "nest start --watch || ts-node-dev -r tsconfig-paths/register src/main.ts",
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
-    "test": "ts-node -r tsconfig-paths/register src/modules/auth/auth.spec.ts && ts-node -r tsconfig-paths/register src/modules/customers/customers.spec.ts && ts-node -r tsconfig-paths/register src/modules/documents/documents.spec.ts && ts-node -r tsconfig-paths/register src/modules/ai/ai.spec.ts && ts-node -r tsconfig-paths/register src/modules/search/search.spec.ts && ts-node -r tsconfig-paths/register src/modules/reminders/reminders.spec.ts && ts-node -r tsconfig-paths/register src/modules/dashboard/dashboard.spec.ts"
+    "test": "ts-node -r tsconfig-paths/register src/modules/auth/auth.spec.ts && ts-node -r tsconfig-paths/register src/modules/customers/customers.spec.ts && ts-node -r tsconfig-paths/register src/modules/documents/documents.spec.ts && ts-node -r tsconfig-paths/register src/modules/ai/ai.spec.ts && ts-node -r tsconfig-paths/register src/modules/search/search.spec.ts && ts-node -r tsconfig-paths/register src/modules/reminders/reminders.spec.ts && ts-node -r tsconfig-paths/register src/modules/dashboard/dashboard.spec.ts && ts-node -r tsconfig-paths/register src/modules/localization/localization.spec.ts"
   },
   "dependencies": {
     "@google/genai": "^2.28.0",

@@ -611,11 +611,12 @@ export class CustomersService {
     try {
       await prisma.auditLog.create({
         data: {
-          userId: user.userId,
+          userId: user.id || undefined,
           branchId: customer.branchId,
           action: 'CUSTOMER_PASSPORT_ADDED',
           entityType: 'PASSPORT',
           entityId: passport.id,
+          ipAddress: '127.0.0.1',
           newStateJson: { customerId, passportMask, expiryDate: dto.expiryDate },
         },
       });
@@ -636,11 +637,12 @@ export class CustomersService {
     try {
       await prisma.auditLog.create({
         data: {
-          userId: user.userId,
+          userId: user.id || undefined,
           branchId: customer.branchId,
           action: 'CUSTOMER_PASSPORT_DELETED',
           entityType: 'PASSPORT',
           entityId: passportId,
+          ipAddress: '127.0.0.1',
         },
       });
     } catch {}
@@ -674,11 +676,12 @@ export class CustomersService {
     try {
       await prisma.auditLog.create({
         data: {
-          userId: user.userId,
+          userId: user.id || undefined,
           branchId: customer.branchId,
           action: 'CUSTOMER_VISA_ADDED',
           entityType: 'VISA',
           entityId: visa.id,
+          ipAddress: '127.0.0.1',
           newStateJson: { country: dto.country, visaCategory: dto.visaCategory, expiryDate: dto.expiryDate },
         },
       });
@@ -699,11 +702,12 @@ export class CustomersService {
     try {
       await prisma.auditLog.create({
         data: {
-          userId: user.userId,
+          userId: user.id || undefined,
           branchId: customer.branchId,
           action: 'CUSTOMER_VISA_DELETED',
           entityType: 'VISA',
           entityId: visaId,
+          ipAddress: '127.0.0.1',
         },
       });
     } catch {}
@@ -741,11 +745,12 @@ export class CustomersService {
     try {
       await prisma.auditLog.create({
         data: {
-          userId: user.userId,
+          userId: user.id || undefined,
           branchId: customer.branchId,
           action: 'CUSTOMER_BOOKING_ADDED',
           entityType: 'TRAVEL_BOOKING',
           entityId: booking.id,
+          ipAddress: '127.0.0.1',
           newStateJson: { bookingRef: dto.bookingRef, pnr: dto.pnr },
         },
       });
@@ -766,11 +771,12 @@ export class CustomersService {
     try {
       await prisma.auditLog.create({
         data: {
-          userId: user.userId,
+          userId: user.id || undefined,
           branchId: customer.branchId,
           action: 'CUSTOMER_BOOKING_DELETED',
           entityType: 'TRAVEL_BOOKING',
           entityId: bookingId,
+          ipAddress: '127.0.0.1',
         },
       });
     } catch {}
@@ -784,7 +790,7 @@ export class CustomersService {
   async addCustomerNote(customerId: string, dto: AddNoteDto, user: AuthenticatedUser) {
     const customer = await this.getCustomerById(customerId, user);
     const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 16);
-    const authorTag = user.name || user.email;
+    const authorTag = user.fullName || user.email;
     const newNoteLine = `[${timestamp} | ${authorTag} (${dto.category})]: ${dto.content.trim()}`;
 
     const updatedNotes = customer.notes ? `${customer.notes}\n\n${newNoteLine}` : newNoteLine;
@@ -797,11 +803,12 @@ export class CustomersService {
     try {
       await prisma.auditLog.create({
         data: {
-          userId: user.userId,
+          userId: user.id || undefined,
           branchId: customer.branchId,
           action: 'CUSTOMER_NOTE_ADDED',
           entityType: 'CUSTOMER',
           entityId: customerId,
+          ipAddress: '127.0.0.1',
           newStateJson: { category: dto.category },
         },
       });
@@ -935,11 +942,12 @@ export class CustomersService {
       // 8. Audit log
       await tx.auditLog.create({
         data: {
-          userId: user.userId,
+          userId: user.id || undefined,
           branchId: target.branchId,
           action: 'CUSTOMERS_MERGED',
           entityType: 'CUSTOMER',
           entityId: target.id,
+          ipAddress: '127.0.0.1',
           newStateJson: {
             targetCustomerId: target.id,
             targetCustomerNumber: target.customerNumber,

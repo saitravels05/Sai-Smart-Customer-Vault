@@ -1,10 +1,10 @@
 import { Controller, Get, Post, Param, Query, UseGuards } from '@nestjs/common';
 import { RemindersService } from './reminders.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ReminderType, ReminderChannel, ReminderStatus } from '@sai/shared-types';
 
-@Controller('v1/reminders')
+@Controller('reminders')
 @UseGuards(JwtAuthGuard)
 export class RemindersController {
   constructor(private readonly remindersService: RemindersService) {}

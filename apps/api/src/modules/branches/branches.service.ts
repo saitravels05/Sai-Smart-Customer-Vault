@@ -85,11 +85,12 @@ export class BranchesService {
     try {
       await prisma.auditLog.create({
         data: {
-          userId: user.userId,
+          userId: user.userId || undefined,
           branchId: created.id,
           action: 'BRANCH_CREATED',
           entityType: 'BRANCH',
           entityId: created.id,
+          ipAddress: '127.0.0.1',
           newStateJson: { code: created.code, name: created.name },
         },
       });
@@ -177,7 +178,7 @@ export class BranchesService {
       staffCode: s.staffCode,
       fullName: s.fullName,
       email: s.user.email,
-      role: s.user.role,
+      role: s.user.role as any,
       designation: s.designation,
       contactNumber: s.contactNumber,
       isActive: s.user.isActive,
@@ -253,11 +254,12 @@ export class BranchesService {
     try {
       await prisma.auditLog.create({
         data: {
-          userId: user.userId,
+          userId: user.userId || undefined,
           branchId: dto.branchId,
           action: 'STAFF_PROVISIONED',
           entityType: 'STAFF_PROFILE',
           entityId: result.profile.id,
+          ipAddress: '127.0.0.1',
           newStateJson: { email: dto.email, role: dto.role, branchId: dto.branchId },
         },
       });
@@ -271,7 +273,7 @@ export class BranchesService {
       staffCode: result.profile.staffCode,
       fullName: result.profile.fullName,
       email: result.user.email,
-      role: result.user.role,
+      role: result.user.role as any,
       designation: result.profile.designation,
       contactNumber: result.profile.contactNumber,
       isActive: result.user.isActive,

@@ -18,9 +18,9 @@ import {
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { Response, Request } from 'express';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { BranchTenantGuard } from '../auth/guards/branch-tenant.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { BranchTenantGuard } from '../../common/guards/branch-tenant.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { DocumentsService, AuthenticatedUser } from './documents.service';
 import { DocumentCategory, DocumentType } from '@sai/database';
 import { DocumentQueryFilter } from './dto/upload-document.dto';
@@ -67,8 +67,8 @@ export class DocumentsController {
       file,
       {
         customerId: body.customerId,
-        category: body.category as DocumentCategory,
-        type: body.type as DocumentType,
+        category: body.category as any,
+        type: body.type as any,
         title: body.title || file.originalname,
         description: body.description,
         tags,

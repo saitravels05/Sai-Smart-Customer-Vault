@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import * as path from 'path';
-import * as archiver from 'archiver';
+import archiver from 'archiver';
 import { prisma, DocumentCategory, DocumentType, UserRole } from '@sai/database';
 import { LocalStorageService } from './storage/local-storage.service';
 import { WatermarkService } from './watermark/watermark.service';
@@ -264,8 +264,8 @@ export class DocumentsService {
         file,
         {
           customerId,
-          category,
-          type,
+          category: category as any,
+          type: type as any,
           title: file.originalname,
         },
         user,
@@ -332,7 +332,7 @@ export class DocumentsService {
               id: true,
               fullName: true,
               customerNumber: true,
-              mobileNumber: true,
+              primaryPhone: true,
               branchId: true,
             },
           },
@@ -437,7 +437,7 @@ export class DocumentsService {
     }
 
     // Build ZIP in memory
-    const archive = archiver('zip', { zlib: { level: 9 } });
+    const archive = (archiver as any)('zip', { zlib: { level: 9 } });
     const chunks: Buffer[] = [];
 
     archive.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -566,8 +566,7 @@ export class DocumentsService {
             role: true,
             staffProfile: {
               select: {
-                firstName: true,
-                lastName: true,
+                fullName: true,
               },
             },
           },

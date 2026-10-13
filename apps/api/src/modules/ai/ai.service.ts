@@ -70,7 +70,7 @@ export class AiService {
   /**
    * Queue & trigger AI document intelligence extraction job
    */
-  async triggerExtraction(documentId: string, user: AuthenticatedUser) {
+  async triggerExtraction(documentId: string, user: AuthenticatedUser): Promise<any> {
     const doc = await this.verifyDocumentBranchAccess(documentId, user);
 
     // 1. Create processing job record
@@ -92,7 +92,7 @@ export class AiService {
       const extraction = await this.geminiService.processDocument(
         fileBuffer,
         doc.mimeType,
-        doc.type,
+        doc.type as any,
         doc.title,
       );
 
@@ -147,7 +147,7 @@ export class AiService {
   /**
    * Get extraction result by Job ID
    */
-  async getExtractionByJobId(jobId: string, user: AuthenticatedUser) {
+  async getExtractionByJobId(jobId: string, user: AuthenticatedUser): Promise<any> {
     const job = await prisma.aIProcessingJob.findUnique({
       where: { id: jobId },
       include: {
@@ -186,7 +186,7 @@ export class AiService {
   /**
    * Get latest extraction for a specific document
    */
-  async getLatestExtractionForDocument(documentId: string, user: AuthenticatedUser) {
+  async getLatestExtractionForDocument(documentId: string, user: AuthenticatedUser): Promise<any> {
     await this.verifyDocumentBranchAccess(documentId, user);
 
     const latestJob = await prisma.aIProcessingJob.findFirst({
@@ -223,7 +223,7 @@ export class AiService {
   /**
    * Human-in-the-loop: Verify extracted data and automatically update customer profile records
    */
-  async verifyAndApply(verifyDto: VerifyAiResultDto, user: AuthenticatedUser) {
+  async verifyAndApply(verifyDto: VerifyAiResultDto, user: AuthenticatedUser): Promise<any> {
     const job = await prisma.aIProcessingJob.findUnique({
       where: { id: verifyDto.jobId },
       include: {
@@ -248,7 +248,7 @@ export class AiService {
       data: {
         verifiedJson: verified,
         isVerified: true,
-        verifiedById: user.userId,
+        verifiedById: (user as any).id || (user as any).userId || null,
         verifiedAt: new Date(),
         appliedToCustomer: verifyDto.applyToCustomer,
       },
