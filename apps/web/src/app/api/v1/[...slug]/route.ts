@@ -1,7 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { prisma } from '@sai/database';
-import * as argon2 from 'argon2';
+import { argon2Verify, argon2id } from 'hash-wasm';
+
+async function hashPassword(plainText: string): Promise<string> {
+  const salt = crypto.randomBytes(16);
+  return await argon2id({
+    password: plainText,
+    salt,
+    parallelism: 4,
+    iterations: 3,
+    memorySize: 65536,
+    hashLength: 32,
+    outputType: 'encoded',
+  });
+}
+
+async function verifyPassword(plainText: string, hash: string): Promise<boolean> {
+  try {
+    return await argon2Verify({ password: plainText, hash });
+  } catch {
+    return false;
+  }
+}
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -291,12 +312,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         );
       }
 
-      const passwordHash = await argon2.hash(newPassword, {
-        type: argon2.argon2id,
-        memoryCost: 65536,
-        timeCost: 3,
-        parallelism: 4,
-      });
+      const passwordHash = await hashPassword(newPassword);
 
       await prisma.$transaction([
         prisma.user.update({
@@ -341,7 +357,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
       let passwordValid = false;
       try {
-        passwordValid = await argon2.verify(user.passwordHash, password);
+        passwordValid = await verifyPassword(password, user.passwordHash);
       } catch {
         passwordValid = false;
       }
@@ -408,12 +424,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         return NextResponse.json({ success: false, error: { message: 'An account with this email address already exists.' } }, { status: 400 });
       }
 
-      const passwordHash = await argon2.hash(body.password, {
-        type: argon2.argon2id,
-        memoryCost: 65536,
-        timeCost: 3,
-        parallelism: 4,
-      });
+      const passwordHash = await hashPassword(body.password);
 
       const request = await prisma.registrationRequest.create({
         data: {
@@ -444,12 +455,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       }
 
       const body = await req.json();
-      const passwordHash = await argon2.hash(body.newPassword, {
-        type: argon2.argon2id,
-        memoryCost: 65536,
-        timeCost: 3,
-        parallelism: 4,
-      });
+      const passwordHash = await hashPassword(body.newPassword);
 
       await prisma.user.update({
         where: { id: user.sub },

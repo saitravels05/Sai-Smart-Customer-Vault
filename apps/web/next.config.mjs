@@ -8,7 +8,7 @@ const nextConfig = {
     unoptimized: true,
   },
   experimental: {
-    serverComponentsExternalPackages: ['argon2', '@prisma/client'],
+    serverComponentsExternalPackages: ['@prisma/client'],
   },
   async rewrites() {
     const backendUrl = process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_URL;
