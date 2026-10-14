@@ -3,6 +3,7 @@ import {
   UnauthorizedException,
   ForbiddenException,
   BadRequestException,
+  NotFoundException,
   Logger,
   OnModuleInit,
 } from '@nestjs/common';
@@ -521,13 +522,20 @@ export class AuthService implements OnModuleInit {
       isMemoryStore = true;
     }
 
-    // Generic safe response to prevent email enumeration
-    const genericSuccess = {
-      message: 'If this email is registered, a password reset verification code has been sent.',
-    };
+    if (!user) {
+      throw new NotFoundException({
+        code: 'EMAIL_NOT_REGISTERED',
+        isNotRegistered: true,
+        message: 'This email is not registered in our system. Please check your email or register for a new account.',
+      });
+    }
 
-    if (!user || !user.isActive) {
-      return genericSuccess;
+    if (!user.isActive) {
+      throw new ForbiddenException({
+        code: 'ACCOUNT_INACTIVE',
+        isInactive: true,
+        message: 'This account has been deactivated. Please contact Madurai Head Office (+91 9894821561) for assistance.',
+      });
     }
 
     // Generate cryptographically secure 6-digit OTP

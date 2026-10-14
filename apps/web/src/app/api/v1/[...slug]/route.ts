@@ -159,17 +159,43 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       const body = await req.json();
       const cleanEmail = (body.email || '').toLowerCase().trim();
 
+      if (!cleanEmail) {
+        return NextResponse.json(
+          { success: false, error: { message: 'Please enter a valid email address.' } },
+          { status: 400 },
+        );
+      }
+
       const user = await prisma.user.findUnique({
         where: { email: cleanEmail },
       });
 
-      const genericResponse = {
-        success: true,
-        message: 'If this email is registered, a password reset verification code has been sent.',
-      };
+      if (!user) {
+        return NextResponse.json(
+          {
+            success: false,
+            isNotRegistered: true,
+            error: {
+              code: 'EMAIL_NOT_REGISTERED',
+              message: 'This email is not registered in our system. Please check your email or register for a new account.',
+            },
+          },
+          { status: 404 },
+        );
+      }
 
-      if (!user || !user.isActive) {
-        return NextResponse.json(genericResponse);
+      if (!user.isActive) {
+        return NextResponse.json(
+          {
+            success: false,
+            isInactive: true,
+            error: {
+              code: 'ACCOUNT_INACTIVE',
+              message: 'This account has been deactivated. Please contact Madurai Head Office (+91 9894821561) for assistance.',
+            },
+          },
+          { status: 403 },
+        );
       }
 
       // Generate 6-digit OTP
@@ -197,7 +223,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       // Dispatch Email via Resend
       await sendResendOtpEmail(cleanEmail, rawOtp);
 
-      return NextResponse.json(genericResponse);
+      return NextResponse.json({
+        success: true,
+        message: 'A verification code has been dispatched to your registered email address.',
+      });
     }
 
     // 2. VERIFY OTP

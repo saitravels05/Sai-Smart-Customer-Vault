@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
@@ -33,6 +33,7 @@ export default function SignupRequestPage() {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<SignupRequestDto>({
     resolver: zodResolver(signupRequestSchema),
@@ -45,6 +46,16 @@ export default function SignupRequestPage() {
       confirmPassword: '',
     },
   });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const emailParam = params.get('email');
+      if (emailParam) {
+        setValue('email', emailParam.trim(), { shouldValidate: true });
+      }
+    }
+  }, [setValue]);
 
   const onSubmit = async (data: SignupRequestDto) => {
     try {

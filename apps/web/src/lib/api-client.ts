@@ -25,7 +25,17 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    const message = error.response?.data?.error?.message || error.message || 'Network request failed';
-    return Promise.reject(new Error(message));
+    const data = error.response?.data;
+    const message = data?.error?.message || data?.message || error.message || 'Network request failed';
+    const customError: any = new Error(message);
+    customError.response = error.response;
+    customError.data = data;
+    customError.status = error.response?.status;
+    customError.code = data?.error?.code;
+    customError.isNotRegistered =
+      data?.isNotRegistered ||
+      data?.error?.code === 'EMAIL_NOT_REGISTERED' ||
+      error.response?.status === 404;
+    return Promise.reject(customError);
   },
 );

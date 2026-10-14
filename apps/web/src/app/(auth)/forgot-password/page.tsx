@@ -17,6 +17,8 @@ import {
   Loader2,
   KeyRound,
   CheckCircle2,
+  UserX,
+  UserPlus,
 } from 'lucide-react';
 
 export default function ForgotPasswordPage() {
@@ -24,6 +26,8 @@ export default function ForgotPasswordPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successInfo, setSuccessInfo] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isNotRegistered, setIsNotRegistered] = useState(false);
+  const [unregisteredEmail, setUnregisteredEmail] = useState('');
 
   const {
     register,
@@ -40,7 +44,21 @@ export default function ForgotPasswordPage() {
     try {
       setIsSubmitting(true);
       setErrorMessage(null);
+      setIsNotRegistered(false);
+      setSuccessInfo(null);
+
       const res: any = await apiClient.post('/auth/forgot-password', data);
+
+      if (
+        res?.isNotRegistered ||
+        res?.data?.isNotRegistered ||
+        res?.error?.code === 'EMAIL_NOT_REGISTERED'
+      ) {
+        setIsNotRegistered(true);
+        setUnregisteredEmail(data.email.trim());
+        return;
+      }
+
       if (res.data?.emailUnconfigured || res.emailUnconfigured) {
         setErrorMessage(
           res.data?.message ||
@@ -55,7 +73,7 @@ export default function ForgotPasswordPage() {
         );
         return;
       }
-      const msg = res.message || 'If this email is registered, a verification code has been sent.';
+      const msg = res.message || 'Verification code has been sent to your registered email.';
       setSuccessInfo(msg);
 
       // Short delay then navigate to OTP verification screen with query param
@@ -63,7 +81,18 @@ export default function ForgotPasswordPage() {
         router.push(`/verify-otp?email=${encodeURIComponent(data.email)}`);
       }, 1500);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to send OTP code. Please try again.');
+      if (
+        err.isNotRegistered ||
+        err.code === 'EMAIL_NOT_REGISTERED' ||
+        err.status === 404 ||
+        err.message?.toLowerCase().includes('not registered')
+      ) {
+        setIsNotRegistered(true);
+        setUnregisteredEmail(data.email.trim());
+        setErrorMessage(null);
+      } else {
+        setErrorMessage(err.message || 'Failed to send OTP code. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -106,6 +135,43 @@ export default function ForgotPasswordPage() {
               <div>
                 <p className="font-semibold">{successInfo}</p>
                 <p className="text-[11px] text-emerald-700 mt-0.5">Redirecting to code verification...</p>
+              </div>
+            </div>
+          )}
+
+          {isNotRegistered && (
+            <div className="p-4 rounded-xl bg-amber-50/90 border border-amber-300 shadow-sm space-y-3 animate-in fade-in duration-200">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0 text-amber-700">
+                  <UserX className="w-4 h-4 text-amber-600" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-amber-900 tracking-tight">
+                      Not Registered In Your Mail
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-200/80 text-amber-800">
+                      NEW USER
+                    </span>
+                  </div>
+                  <p className="text-xs text-amber-800 leading-relaxed">
+                    <span className="font-semibold break-all text-slate-900">{unregisteredEmail}</span> is not registered in our system. Password reset is only available for existing accounts.
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-amber-200/60 flex items-center justify-between">
+                <span className="text-[11px] text-amber-700 font-medium">
+                  Need an authorized staff account?
+                </span>
+                <Link
+                  href={`/signup?email=${encodeURIComponent(unregisteredEmail)}`}
+                  className="inline-flex items-center gap-1.5 bg-[#E85A18] hover:bg-[#D44E0F] text-white px-3.5 py-1.5 rounded-lg text-xs font-bold transition shadow-sm hover:shadow"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Go to Register now</span>
+                  <ArrowRight className="w-3 h-3" />
+                </Link>
               </div>
             </div>
           )}
