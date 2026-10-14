@@ -46,16 +46,18 @@ if (engineSource) {
       const relativeAdditions = [
         './libquery_engine-rhel-openssl-3.0.x.so.node',
         '../libquery_engine-rhel-openssl-3.0.x.so.node',
-        '../../.prisma/client/libquery_engine-rhel-openssl-3.0.x.so.node',
-        '../../../libquery_engine-rhel-openssl-3.0.x.so.node',
       ];
       for (const rel of relativeAdditions) {
         if (!nftData.files.includes(rel)) {
           nftData.files.push(rel);
         }
       }
+      nftData.files = nftData.files.filter(f => {
+        const full = path.resolve(path.dirname(nftPath), f);
+        return fs.existsSync(full);
+      });
       fs.writeFileSync(nftPath, JSON.stringify(nftData, null, 2));
-      console.log('Postbuild: Updated NFT JSON trace for route.js');
+      console.log('Postbuild: Updated and verified NFT JSON trace for route.js');
     } catch (e) {
       console.error('Postbuild: Failed to update NFT JSON:', e.message);
     }
