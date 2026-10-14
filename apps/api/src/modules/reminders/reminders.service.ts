@@ -243,7 +243,7 @@ export class RemindersService {
       offset?: number;
     },
   ): Promise<ReminderDto[]> {
-    const branchWhere = user.role === UserRole.SUPER_ADMIN ? {} : { customer: { branchId: user.branchId } };
+    const branchWhere = user.role === UserRole.OWNER ? {} : { customer: { branchId: user.branchId } };
 
     const where: any = {
       ...branchWhere,
@@ -308,7 +308,7 @@ export class RemindersService {
    * Compute aggregated dashboard metrics for expiry alerts
    */
   async getReminderStats(user: AuthUserContext): Promise<ReminderStatsDto> {
-    const branchWhere = user.role === UserRole.SUPER_ADMIN ? {} : { customer: { branchId: user.branchId } };
+    const branchWhere = user.role === UserRole.OWNER ? {} : { customer: { branchId: user.branchId } };
 
     const activeReminders = await prisma.reminder.findMany({
       where: {
@@ -472,7 +472,7 @@ export class RemindersService {
       throw new NotFoundException(`Reminder with ID "${id}" was not found.`);
     }
 
-    if (user.role !== UserRole.SUPER_ADMIN && reminder.customer.branchId !== user.branchId) {
+    if (user.role !== UserRole.OWNER && reminder.customer.branchId !== user.branchId) {
       throw new ForbiddenException('Access denied: You cannot manage reminders belonging to another branch.');
     }
 

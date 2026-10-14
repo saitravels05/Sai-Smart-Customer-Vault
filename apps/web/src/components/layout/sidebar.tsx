@@ -22,6 +22,9 @@ import {
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/context/language-context';
 
+import { useAuth } from '@/context/auth-context';
+import { UserCheck, UserCog, KeyRound } from 'lucide-react';
+
 interface SidebarProps {
   mobileOpen?: boolean;
   onClose?: () => void;
@@ -30,13 +33,30 @@ interface SidebarProps {
 export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { t, isTamil } = useLanguage();
+  const { user, isOwner } = useAuth();
 
   const navigationItems = [
     {
       name: t('nav.dashboard', 'Executive Dashboard'),
-      href: '/',
+      href: '/dashboard',
       icon: LayoutDashboard,
     },
+    ...(isOwner
+      ? [
+          {
+            name: isTamil ? 'உரிமையாளர் ஒப்புதல்கள்' : 'Registration Approvals',
+            href: '/owner/approvals',
+            icon: UserCheck,
+            badge: 'Owner',
+          },
+          {
+            name: isTamil ? 'பயனர் நிர்வாகம்' : 'User Management',
+            href: '/owner/users',
+            icon: UserCog,
+            badge: 'Owner',
+          },
+        ]
+      : []),
     {
       name: t('nav.customers', 'Customer Directory'),
       href: '/customers',
@@ -84,6 +104,11 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
       name: t('nav.auditCompliance', 'Audit & Compliance'),
       href: '/audit-logs',
       icon: ShieldCheck,
+    },
+    {
+      name: isTamil ? 'கடவுச்சொல் & பாதுகாப்பு' : 'Security & Passwords',
+      href: '/settings/security',
+      icon: KeyRound,
     },
     {
       name: t('nav.settings', 'Settings'),

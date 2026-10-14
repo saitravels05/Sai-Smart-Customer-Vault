@@ -28,8 +28,8 @@ export class RolesGuard implements CanActivate {
       });
     }
 
-    // Super Admin has unrestricted organizational privilege
-    if (user.role === UserRole.SUPER_ADMIN) {
+    // Owner has unrestricted organizational privilege
+    if (user.role === UserRole.OWNER) {
       return true;
     }
 

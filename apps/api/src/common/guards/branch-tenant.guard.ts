@@ -33,8 +33,8 @@ export class BranchTenantGuard implements CanActivate {
       throw new ForbiddenException('User context missing');
     }
 
-    // Super Admin has multi-branch clearance across Madurai & Trichy
-    if (user.role === UserRole.SUPER_ADMIN) {
+    // Owner has multi-branch clearance across Madurai & Trichy
+    if (user.role === UserRole.OWNER) {
       return true;
     }
 

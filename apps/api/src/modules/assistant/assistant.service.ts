@@ -83,8 +83,8 @@ export class AssistantService {
         };
       }
 
-      // Strict tenancy check: Non-superadmin cannot inspect another branch's customer
-      if (user.role !== UserRole.SUPER_ADMIN && customer.branchId !== user.branchId) {
+      // Strict tenancy check: Non-owner/admin cannot inspect another branch's customer
+      if (user.role !== UserRole.OWNER && customer.branchId !== user.branchId) {
         throw new ForbiddenException('Access Denied: You cannot query customer records belonging to another branch.');
       }
 
@@ -151,7 +151,7 @@ ${customer.documents.map((d) => `- ${d.title} [${d.type}] (Uploaded: ${new Date(
       }
     } else {
       // Case B: General Travel Desk Questions (Scoped to Staff's Branch)
-      const branchWhere = user.role === UserRole.SUPER_ADMIN ? {} : { branchId: user.branchId };
+      const branchWhere = user.role === UserRole.OWNER ? {} : { branchId: user.branchId };
       const intent = SearchIntentParser.parse(question);
 
       if (intent.intentType === 'PASSPORT_EXPIRY' || intent.detectedEntities.expiryDays) {

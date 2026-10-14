@@ -45,7 +45,7 @@ export class ComplianceService {
       throw new NotFoundException(`Customer with ID ${customerId} not found.`);
     }
 
-    if (user.role !== UserRole.SUPER_ADMIN) {
+    if (user.role !== UserRole.OWNER) {
       if (user.branchId && customer.branchId !== user.branchId) {
         throw new ForbiddenException(
           'Security Violation: Staff is strictly restricted to customers in their assigned branch.',
@@ -178,10 +178,10 @@ export class ComplianceService {
   ): Promise<any> {
     const customer = await this.verifyCustomerAccess(customerId, user);
 
-    // Only Branch Manager or Super Admin can authorize statutory erasure
-    if (user.role !== UserRole.SUPER_ADMIN && user.role !== UserRole.BRANCH_MANAGER) {
+    // Only Admin or Owner can authorize statutory erasure
+    if (user.role !== UserRole.OWNER && user.role !== UserRole.ADMIN) {
       throw new ForbiddenException(
-        'DPDPA Erasure authorization requires Branch Manager or Super Admin privilege.',
+        'DPDPA Erasure authorization requires Admin or Owner privilege.',
       );
     }
 
@@ -261,7 +261,7 @@ export class ComplianceService {
     try {
       const where: any = {};
 
-      if (user.role !== UserRole.SUPER_ADMIN) {
+      if (user.role !== UserRole.OWNER) {
         where.branchId = user.branchId;
       } else if (queryDto.branchId) {
         where.branchId = queryDto.branchId;
@@ -314,7 +314,7 @@ export class ComplianceService {
    */
   async verifyAuditTrailIntegrity(user: AuthenticatedUser): Promise<any> {
     const where: any = {};
-    if (user.role !== UserRole.SUPER_ADMIN && user.branchId) {
+    if (user.role !== UserRole.OWNER && user.branchId) {
       where.branchId = user.branchId;
     }
 

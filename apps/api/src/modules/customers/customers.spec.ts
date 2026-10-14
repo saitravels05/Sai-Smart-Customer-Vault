@@ -71,7 +71,7 @@ describe('Phase 4 — Customer CRM Module Suite', () => {
 
       const buildWhereClause = (user: typeof staffUser, requestedFilter?: any) => {
         const where: any = { isDeleted: false };
-        if (user.role === UserRole.SUPER_ADMIN) {
+        if (user.role === UserRole.OWNER) {
           if (requestedFilter?.branchId) where.branchId = requestedFilter.branchId;
         } else {
           where.branchId = user.branchId;
@@ -81,18 +81,18 @@ describe('Phase 4 — Customer CRM Module Suite', () => {
 
       const where = buildWhereClause(staffUser, { branchId: maduraiBranchId });
       // Even if Trichy staff requests Madurai, the system must enforce Trichy branchId
-      assert.equal(where.branchId, trichyBranchId, 'Must enforce user branchId on non-super-admin');
+      assert.equal(where.branchId, trichyBranchId, 'Must enforce user branchId on non-owner');
     });
 
-    test('Super Admin query allows querying across any branch or all branches', () => {
-      const superAdmin = {
-        role: UserRole.SUPER_ADMIN,
+    test('Owner query allows querying across any branch or all branches', () => {
+      const ownerUser = {
+        role: UserRole.OWNER,
         branchId: maduraiBranchId,
       };
 
-      const buildWhereClause = (user: typeof superAdmin, requestedFilter?: any) => {
+      const buildWhereClause = (user: typeof ownerUser, requestedFilter?: any) => {
         const where: any = { isDeleted: false };
-        if (user.role === UserRole.SUPER_ADMIN) {
+        if (user.role === UserRole.OWNER) {
           if (requestedFilter?.branchId) where.branchId = requestedFilter.branchId;
         } else {
           where.branchId = user.branchId;
@@ -100,11 +100,11 @@ describe('Phase 4 — Customer CRM Module Suite', () => {
         return where;
       };
 
-      const whereSpecific = buildWhereClause(superAdmin, { branchId: trichyBranchId });
-      assert.equal(whereSpecific.branchId, trichyBranchId, 'Super Admin can scope to Trichy');
+      const whereSpecific = buildWhereClause(ownerUser, { branchId: trichyBranchId });
+      assert.equal(whereSpecific.branchId, trichyBranchId, 'Owner can scope to Trichy');
 
-      const whereAll = buildWhereClause(superAdmin, {});
-      assert.equal(whereAll.branchId, undefined, 'Super Admin can query all branches without restriction');
+      const whereAll = buildWhereClause(ownerUser, {});
+      assert.equal(whereAll.branchId, undefined, 'Owner can query all branches without restriction');
     });
   });
 
@@ -154,13 +154,12 @@ describe('Phase 4 — Customer CRM Module Suite', () => {
 
     test('should enforce merge customer profile authorization', () => {
       const canMerge = (role: UserRole) => {
-        return role === UserRole.SUPER_ADMIN || role === UserRole.BRANCH_MANAGER;
+        return role === UserRole.OWNER || role === UserRole.ADMIN;
       };
 
-      assert.equal(canMerge(UserRole.SUPER_ADMIN), true, 'Super Admin can merge');
-      assert.equal(canMerge(UserRole.BRANCH_MANAGER), true, 'Branch Manager can merge');
+      assert.equal(canMerge(UserRole.OWNER), true, 'Owner can merge');
+      assert.equal(canMerge(UserRole.ADMIN), true, 'Admin can merge');
       assert.equal(canMerge(UserRole.STAFF), false, 'Staff cannot merge');
-      assert.equal(canMerge(UserRole.READ_ONLY), false, 'Read-only cannot merge');
     });
 
     test('should calculate duplicate match scores accurately', () => {

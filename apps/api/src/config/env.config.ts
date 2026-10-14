@@ -29,6 +29,16 @@ export const envSchema = z.object({
   AI_PROVIDER: z.enum(['gemini', 'openai', 'local']).default('gemini'),
   GEMINI_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
+  INITIAL_OWNER_PASSWORD: z.string().optional(),
+  EMAIL_PROVIDER: z.string().optional(),
+  EMAIL_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().optional(),
+  APP_BASE_URL: z.string().optional(),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

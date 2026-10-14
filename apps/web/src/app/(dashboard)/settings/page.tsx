@@ -405,11 +405,11 @@ export default function SettingsPage() {
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-bold text-slate-900">{user?.fullName || 'Super Administrator'}</p>
-                  <p className="text-slate-500 font-mono text-[11px]">{user?.email || 'admin@saitravelservices.com'}</p>
+                  <p className="font-bold text-slate-900">{user?.fullName || 'SAI Tours & Travels Owner'}</p>
+                  <p className="text-slate-500 font-mono text-[11px]">{user?.email || 'saipassportmdu@gmail.com'}</p>
                 </div>
                 <span className="px-2.5 py-1 bg-[#0B192C] text-white text-[10px] font-bold rounded-lg uppercase tracking-wider">
-                  {user?.role || 'SUPER_ADMIN'}
+                  {user?.role || 'OWNER'}
                 </span>
               </div>
             </div>

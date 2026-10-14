@@ -53,7 +53,7 @@ export class DocumentsService {
       throw new NotFoundException(`Customer with ID ${customerId} not found.`);
     }
 
-    if (user.role !== UserRole.SUPER_ADMIN) {
+    if (user.role !== UserRole.OWNER) {
       if (!user.branchId || customer.branchId !== user.branchId) {
         throw new ForbiddenException(
           'Security Violation: Staff is strictly restricted to customer records in their assigned branch.',
@@ -84,7 +84,7 @@ export class DocumentsService {
       throw new NotFoundException(`Document with ID ${documentId} not found.`);
     }
 
-    if (user.role !== UserRole.SUPER_ADMIN) {
+    if (user.role !== UserRole.OWNER) {
       if (!user.branchId || doc.customer.branchId !== user.branchId) {
         throw new ForbiddenException(
           'Security Violation: You do not have permission to access documents belonging to another branch.',
@@ -290,7 +290,7 @@ export class DocumentsService {
       if (filter.customerId) {
         await this.verifyCustomerBranchAccess(filter.customerId, user);
         where.customerId = filter.customerId;
-      } else if (user.role !== UserRole.SUPER_ADMIN && user.branchId) {
+      } else if (user.role !== UserRole.OWNER && user.branchId) {
         // Must only query documents within user's branch
         where.branchId = user.branchId;
       } else if (filter.branchId) {
@@ -538,9 +538,12 @@ export class DocumentsService {
   }
 
   /**
-   * Soft-delete document
+   * Soft-delete document (Restricted to OWNER and ADMIN)
    */
   async deleteDocument(documentId: string, user: AuthenticatedUser) {
+    if (user.role === UserRole.STAFF) {
+      throw new ForbiddenException('Staff role is not authorized to delete documents.');
+    }
     const doc = await this.verifyDocumentBranchAccess(documentId, user);
     const updated = await prisma.document.update({
       where: { id: doc.id },

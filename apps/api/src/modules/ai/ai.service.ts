@@ -56,7 +56,7 @@ export class AiService {
       throw new NotFoundException(`Document with ID ${documentId} not found.`);
     }
 
-    if (user.role !== UserRole.SUPER_ADMIN) {
+    if (user.role !== UserRole.OWNER) {
       if (!user.branchId || doc.customer.branchId !== user.branchId) {
         throw new ForbiddenException(
           'Security Violation: Staff is strictly restricted to documents in their assigned branch.',
@@ -226,7 +226,7 @@ export class AiService {
   async getQueue(user: AuthenticatedUser): Promise<any[]> {
     try {
       const branchWhere =
-        user.role === UserRole.SUPER_ADMIN || !user.branchId
+        user.role === UserRole.OWNER || !user.branchId
           ? {}
           : { document: { customer: { branchId: user.branchId } } };
 

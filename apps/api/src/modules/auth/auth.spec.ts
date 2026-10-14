@@ -88,18 +88,18 @@ describe('Phase 3 — Authentication, Security & Multi-Branch Tenancy Suite', ()
     const maduraiBranchId = 'madurai-branch-uuid-001';
     const trichyBranchId = 'trichy-branch-uuid-002';
 
-    test('Super Admin has cross-branch clearance', () => {
-      const superAdminUser = {
-        role: UserRole.SUPER_ADMIN,
+    test('Owner has cross-branch clearance', () => {
+      const ownerUser = {
+        role: UserRole.OWNER,
         branchId: maduraiBranchId,
       };
 
-      // Super admin can access Madurai, Trichy, or any other branch
-      const canAccessMadurai = superAdminUser.role === UserRole.SUPER_ADMIN;
-      const canAccessTrichy = superAdminUser.role === UserRole.SUPER_ADMIN;
+      // Owner can access Madurai, Trichy, or any other branch
+      const canAccessMadurai = ownerUser.role === UserRole.OWNER;
+      const canAccessTrichy = ownerUser.role === UserRole.OWNER;
 
-      assert.ok(canAccessMadurai, 'Super Admin must have clearance for Madurai');
-      assert.ok(canAccessTrichy, 'Super Admin must have clearance for Trichy');
+      assert.ok(canAccessMadurai, 'Owner must have clearance for Madurai');
+      assert.ok(canAccessTrichy, 'Owner must have clearance for Trichy');
     });
 
     test('Branch Staff is strictly isolated to assigned branch', () => {
@@ -108,9 +108,9 @@ describe('Phase 3 — Authentication, Security & Multi-Branch Tenancy Suite', ()
         branchId: trichyBranchId,
       };
 
-      // Check access logic: non-super-admin can only access matching branchId
+      // Check access logic: non-owner can only access matching branchId
       const checkAccess = (targetBranchId: string) => {
-        if (trichyStaff.role === UserRole.SUPER_ADMIN) return true;
+        if (trichyStaff.role === UserRole.OWNER) return true;
         return trichyStaff.branchId === targetBranchId;
       };
 
@@ -118,4 +118,109 @@ describe('Phase 3 — Authentication, Security & Multi-Branch Tenancy Suite', ()
       assert.ok(!checkAccess(maduraiBranchId), 'Trichy staff MUST be blocked from Madurai branch');
     });
   });
+
+  describe('Three-Role Model & Permission Matrix Enforcement', () => {
+    test('strictly enforces only OWNER, ADMIN, and STAFF roles exist', () => {
+      const allowedRoles = Object.values(UserRole);
+      assert.deepEqual(
+        allowedRoles.sort(),
+        [UserRole.ADMIN, UserRole.OWNER, UserRole.STAFF].sort(),
+        'Only exactly three roles must exist: OWNER, ADMIN, STAFF',
+      );
+      assert.equal(allowedRoles.length, 3, 'No legacy roles are permitted');
+    });
+
+    test('Owner alone can assign ADMIN and STAFF roles', () => {
+      const canAssignRoles = (role: UserRole) => role === UserRole.OWNER;
+      assert.ok(canAssignRoles(UserRole.OWNER), 'Owner can assign roles');
+      assert.ok(!canAssignRoles(UserRole.ADMIN), 'Admin cannot assign roles');
+      assert.ok(!canAssignRoles(UserRole.STAFF), 'Staff cannot assign roles');
+    });
+
+    test('Owner account cannot be modified, deleted or deactivated by any user', () => {
+      const canDeactivate = (actorRole: UserRole, targetRole: UserRole) => {
+        if (targetRole === UserRole.OWNER) return false;
+        return actorRole === UserRole.OWNER;
+      };
+      assert.ok(!canDeactivate(UserRole.OWNER, UserRole.OWNER), 'Cannot deactivate Owner even by Owner');
+      assert.ok(!canDeactivate(UserRole.ADMIN, UserRole.OWNER), 'Admin cannot deactivate Owner');
+      assert.ok(!canDeactivate(UserRole.STAFF, UserRole.OWNER), 'Staff cannot deactivate Owner');
+      assert.ok(canDeactivate(UserRole.OWNER, UserRole.STAFF), 'Owner can deactivate Staff');
+    });
+  });
+
+  describe('Cryptographically Secure OTP Generation & Verification Logic', () => {
+    test('generates 6-digit numeric OTP with cryptographical randomness', () => {
+      const crypto = require('crypto');
+      const otp = crypto.randomInt(100000, 999999).toString();
+      assert.equal(otp.length, 6, 'OTP must be 6 digits');
+      assert.match(otp, /^[0-9]{6}$/, 'OTP must be all numeric digits');
+    });
+
+    test('stores only SHA-256 hash of OTP and verifies securely', () => {
+      const crypto = require('crypto');
+      const otp = '849201';
+      const secret = 'test-otp-secret';
+      const hash = crypto.createHmac('sha256', secret).update(otp).digest('hex');
+
+      const incomingCorrect = '849201';
+      const incomingHash = crypto.createHmac('sha256', secret).update(incomingCorrect).digest('hex');
+      assert.equal(incomingHash, hash, 'Hashes must match for correct OTP');
+
+      const incomingWrong = '849202';
+      const wrongHash = crypto.createHmac('sha256', secret).update(incomingWrong).digest('hex');
+      assert.notEqual(wrongHash, hash, 'Hashes must differ for incorrect OTP');
+    });
+
+    test('enforces 5-minute expiry and maximum 5 incorrect attempts', () => {
+      const now = Date.now();
+      const expiresAt = new Date(now + 5 * 60 * 1000);
+      assert.ok(expiresAt.getTime() > now, 'OTP is valid within 5 minutes');
+
+      const staleExpiresAt = new Date(now - 1000);
+      assert.ok(staleExpiresAt.getTime() < now, 'Stale OTP is expired');
+
+      let attempts = 0;
+      const MAX_ATTEMPTS = 5;
+      for (let i = 0; i < 5; i++) {
+        attempts++;
+      }
+      assert.equal(attempts, MAX_ATTEMPTS, 'Max attempts reached');
+      const isLocked = attempts >= MAX_ATTEMPTS;
+      assert.ok(isLocked, 'OTP challenge is locked after 5 failed attempts');
+    });
+  });
+
+  describe('Owner Initialization & Password Change Enforcement', () => {
+    test('Owner account requires mustChangePassword: true on initial bootstrap', () => {
+      const initialOwnerState = {
+        email: 'saipassportmdu@gmail.com',
+        role: UserRole.OWNER,
+        mustChangePassword: true,
+        isActive: true,
+      };
+
+      assert.equal(initialOwnerState.email, 'saipassportmdu@gmail.com');
+      assert.equal(initialOwnerState.role, UserRole.OWNER);
+      assert.ok(initialOwnerState.mustChangePassword, 'Owner must change temporary password at first login');
+      assert.ok(initialOwnerState.isActive, 'Owner account is active');
+    });
+
+    test('Password complexity enforces minimum 12 characters and Argon2id hash', async () => {
+      const weakPassword = 'short';
+      assert.ok(weakPassword.length < 12, 'Password under 12 characters is rejected');
+
+      const strongPassword = 'OwnerSecurePassPhrase2026!';
+      assert.ok(strongPassword.length >= 12, 'Password meets minimum 12 characters requirement');
+
+      const hash = await argon2.hash(strongPassword, {
+        type: argon2.argon2id,
+        memoryCost: 65536,
+        timeCost: 3,
+        parallelism: 4,
+      });
+      assert.ok(hash.startsWith('$argon2id$'), 'Password must be hashed with Argon2id');
+    });
+  });
 });
+

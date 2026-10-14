@@ -61,7 +61,7 @@ export class CustomersController {
   }
 
   @Post()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.BRANCH_MANAGER, UserRole.STAFF)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.STAFF)
   @ApiOperation({ summary: 'Register a new customer profile' })
   @ApiResponse({ status: 201, description: 'Customer created successfully' })
   async create(
@@ -119,7 +119,7 @@ export class CustomersController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.BRANCH_MANAGER, UserRole.STAFF)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.STAFF)
   @ApiOperation({ summary: 'Update customer details' })
   @ApiParam({ name: 'id', description: 'Customer UUID' })
   async update(
@@ -139,7 +139,7 @@ export class CustomersController {
   }
 
   @Post(':id/archive')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.BRANCH_MANAGER)
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Archive a customer record' })
   @ApiParam({ name: 'id', description: 'Customer UUID' })
@@ -159,7 +159,7 @@ export class CustomersController {
   }
 
   @Post(':id/restore')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.BRANCH_MANAGER)
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Restore an archived customer record' })
   @ApiParam({ name: 'id', description: 'Customer UUID' })
@@ -193,7 +193,7 @@ export class CustomersController {
   }
 
   @Post(':id/relationships')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.BRANCH_MANAGER, UserRole.STAFF)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.STAFF)
   @ApiOperation({ summary: 'Link family member or group co-passenger' })
   @ApiParam({ name: 'id', description: 'Customer UUID' })
   async linkFamily(
@@ -214,7 +214,7 @@ export class CustomersController {
   }
 
   @Delete(':id/relationships/:relId')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.BRANCH_MANAGER, UserRole.STAFF)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.STAFF)
   @ApiOperation({ summary: 'Remove relationship link' })
   async deleteRelationship(
     @Param('id') customerId: string,
@@ -230,7 +230,7 @@ export class CustomersController {
   }
 
   @Post(':id/passports')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.BRANCH_MANAGER, UserRole.STAFF)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.STAFF)
   @ApiOperation({ summary: 'Add passport to customer profile' })
   async addPassport(
     @Param('id') customerId: string,
@@ -246,7 +246,7 @@ export class CustomersController {
   }
 
   @Delete(':id/passports/:passportId')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.BRANCH_MANAGER, UserRole.STAFF)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.STAFF)
   @ApiOperation({ summary: 'Delete passport from customer profile' })
   async deletePassport(
     @Param('id') customerId: string,
@@ -262,7 +262,7 @@ export class CustomersController {
   }
 
   @Post(':id/visas')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.BRANCH_MANAGER, UserRole.STAFF)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.STAFF)
   @ApiOperation({ summary: 'Add visa to customer profile' })
   async addVisa(
     @Param('id') customerId: string,
@@ -278,7 +278,7 @@ export class CustomersController {
   }
 
   @Delete(':id/visas/:visaId')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.BRANCH_MANAGER, UserRole.STAFF)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.STAFF)
   @ApiOperation({ summary: 'Delete visa from customer profile' })
   async deleteVisa(
     @Param('id') customerId: string,
@@ -294,7 +294,7 @@ export class CustomersController {
   }
 
   @Post(':id/bookings')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.BRANCH_MANAGER, UserRole.STAFF)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.STAFF)
   @ApiOperation({ summary: 'Add travel booking (flight/hotel) to customer' })
   async addBooking(
     @Param('id') customerId: string,
@@ -310,7 +310,7 @@ export class CustomersController {
   }
 
   @Delete(':id/bookings/:bookingId')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.BRANCH_MANAGER, UserRole.STAFF)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.STAFF)
   @ApiOperation({ summary: 'Delete travel booking' })
   async deleteBooking(
     @Param('id') customerId: string,
@@ -326,7 +326,7 @@ export class CustomersController {
   }
 
   @Post(':id/notes')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.BRANCH_MANAGER, UserRole.STAFF)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.STAFF)
   @ApiOperation({ summary: 'Add staff note to customer record' })
   async addNote(
     @Param('id') customerId: string,
@@ -355,7 +355,7 @@ export class CustomersController {
   }
 
   @Post(':id/merge')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.BRANCH_MANAGER)
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({ summary: 'Merge duplicate customer into target profile' })
   async mergeCustomer(
     @Param('id') targetCustomerId: string,

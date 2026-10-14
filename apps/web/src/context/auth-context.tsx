@@ -9,9 +9,14 @@ interface AuthContextType {
   user: AuthUserResponse | null;
   token: string | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<LoginResponseDto>;
+  isAuthenticated: boolean;
+  isOwner: boolean;
+  isAdmin: boolean;
+  isStaff: boolean;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<LoginResponseDto>;
   verifyMfa: (userId: string, totpCode: string) => Promise<void>;
   logout: () => void;
+  checkSession: () => Promise<AuthUserResponse | null>;
   activeBranchId: string;
   setActiveBranchId: (id: string) => void;
 }
@@ -25,43 +30,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const router = useRouter();
 
-  useEffect(() => {
-    const savedToken = localStorage.getItem('sai_access_token');
-    const savedBranch = localStorage.getItem('sai_active_branch_id');
-    const savedUser = localStorage.getItem('sai_user_profile');
-
-    if (savedToken && savedUser) {
-      try {
-        setToken(savedToken);
-        const parsed = JSON.parse(savedUser);
-        setUser(parsed);
-        setActiveBranchIdState(savedBranch || parsed.branchId || '');
-      } catch {
-        localStorage.clear();
+  const checkSession = async (): Promise<AuthUserResponse | null> => {
+    try {
+      const res: any = await apiClient.get('/auth/me');
+      if (res && res.data && res.data.user) {
+        const u = res.data.user;
+        setUser(u);
+        setActiveBranchIdState(u.branchId || '');
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('sai_user_profile', JSON.stringify(u));
+        }
+        return u;
+      }
+    } catch {
+      // If server session check fails, check local fallback
+      if (typeof window !== 'undefined') {
+        const savedUser = localStorage.getItem('sai_user_profile');
+        if (savedUser) {
+          try {
+            const parsed = JSON.parse(savedUser);
+            setUser(parsed);
+            setActiveBranchIdState(parsed.branchId || '');
+            return parsed;
+          } catch {}
+        }
       }
     }
-    setIsLoading(false);
+    return null;
+  };
+
+  useEffect(() => {
+    const initAuth = async () => {
+      setIsLoading(true);
+      await checkSession();
+      setIsLoading(false);
+    };
+    initAuth();
   }, []);
 
   const setActiveBranchId = (id: string) => {
     setActiveBranchIdState(id);
-    localStorage.setItem('sai_active_branch_id', id);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sai_active_branch_id', id);
+    }
   };
 
-  const login = async (email: string, password: string): Promise<LoginResponseDto> => {
-    const res: any = await apiClient.post('/auth/login', { email, password });
+  const login = async (
+    email: string,
+    password: string,
+    rememberMe = false,
+  ): Promise<LoginResponseDto> => {
+    const res: any = await apiClient.post('/auth/login', { email, password, rememberMe });
     const data: LoginResponseDto = res.data;
 
-    if (!data.requiresMfa && data.accessToken && data.user) {
-      setToken(data.accessToken);
+    if (!data.requiresMfa && data.user) {
       setUser(data.user);
       setActiveBranchId(data.user.branchId);
 
-      localStorage.setItem('sai_access_token', data.accessToken);
-      if (data.refreshToken) {
-        localStorage.setItem('sai_refresh_token', data.refreshToken);
+      if (data.accessToken) {
+        setToken(data.accessToken);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('sai_access_token', data.accessToken);
+          localStorage.setItem('sai_user_profile', JSON.stringify(data.user));
+        }
       }
-      localStorage.setItem('sai_user_profile', JSON.stringify(data.user));
     }
 
     return data;
@@ -71,30 +103,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const res: any = await apiClient.post('/auth/mfa/verify', { userId, totpCode });
     const data: LoginResponseDto = res.data;
 
-    if (data.accessToken && data.user) {
-      setToken(data.accessToken);
+    if (data.user) {
       setUser(data.user);
       setActiveBranchId(data.user.branchId);
-
-      localStorage.setItem('sai_access_token', data.accessToken);
-      if (data.refreshToken) {
-        localStorage.setItem('sai_refresh_token', data.refreshToken);
+      if (data.accessToken) {
+        setToken(data.accessToken);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('sai_access_token', data.accessToken);
+          localStorage.setItem('sai_user_profile', JSON.stringify(data.user));
+        }
       }
-      localStorage.setItem('sai_user_profile', JSON.stringify(data.user));
-      router.push('/');
+      router.push('/dashboard');
     }
   };
 
   const logout = () => {
     apiClient.post('/auth/logout').catch(() => {});
-    localStorage.removeItem('sai_access_token');
-    localStorage.removeItem('sai_refresh_token');
-    localStorage.removeItem('sai_user_profile');
-    localStorage.removeItem('sai_active_branch_id');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('sai_access_token');
+      localStorage.removeItem('sai_refresh_token');
+      localStorage.removeItem('sai_user_profile');
+      localStorage.removeItem('sai_active_branch_id');
+    }
     setToken(null);
     setUser(null);
     router.push('/login');
   };
+
+  const isOwner = user?.role === 'OWNER';
+  const isAdmin = user?.role === 'ADMIN' || isOwner;
+  const isStaff = user?.role === 'STAFF';
 
   return (
     <AuthContext.Provider
@@ -102,9 +140,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         token,
         isLoading,
+        isAuthenticated: !!user,
+        isOwner,
+        isAdmin,
+        isStaff,
         login,
         verifyMfa,
         logout,
+        checkSession,
         activeBranchId,
         setActiveBranchId,
       }}

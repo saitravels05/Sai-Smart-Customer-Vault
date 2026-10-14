@@ -306,7 +306,7 @@ export default function CustomerProfilePage() {
   }
 
   const isSuperAdminOrBranchManager =
-    user?.role === 'SUPER_ADMIN' || user?.role === 'BRANCH_MANAGER';
+    user?.role === 'OWNER' || user?.role === 'ADMIN';
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">

@@ -27,8 +27,8 @@ export class DashboardService {
    */
   async getExecutiveKpis(user: AuthUserContext): Promise<ExecutiveDashboardKpisDto> {
     try {
-      const branchWhere = user.role === UserRole.SUPER_ADMIN ? {} : { branchId: user.branchId };
-      const branchCustomerWhere = user.role === UserRole.SUPER_ADMIN ? {} : { customer: { branchId: user.branchId } };
+      const branchWhere = user.role === UserRole.OWNER ? {} : { branchId: user.branchId };
+      const branchCustomerWhere = user.role === UserRole.OWNER ? {} : { customer: { branchId: user.branchId } };
 
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -124,8 +124,8 @@ export class DashboardService {
   async getDashboardAnalytics(user: AuthUserContext): Promise<DashboardAnalyticsDto> {
     const kpis = await this.getExecutiveKpis(user);
     try {
-      const branchWhere = user.role === UserRole.SUPER_ADMIN ? {} : { branchId: user.branchId };
-      const branchCustomerWhere = user.role === UserRole.SUPER_ADMIN ? {} : { customer: { branchId: user.branchId } };
+      const branchWhere = user.role === UserRole.OWNER ? {} : { branchId: user.branchId };
+      const branchCustomerWhere = user.role === UserRole.OWNER ? {} : { customer: { branchId: user.branchId } };
 
       // 1. Monthly Registrations Trend (past 6 months)
       const monthlyRegistrations: MonthlyRegistrationStat[] = [];
@@ -192,7 +192,7 @@ export class DashboardService {
       const docs = await prisma.document.findMany({
         where: {
           isDeleted: false,
-          ...(user.role === UserRole.SUPER_ADMIN ? {} : { customer: { branchId: user.branchId } }),
+          ...(user.role === UserRole.OWNER ? {} : { customer: { branchId: user.branchId } }),
         },
         select: { type: true },
       });

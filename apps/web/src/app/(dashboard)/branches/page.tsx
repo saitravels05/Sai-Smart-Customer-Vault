@@ -128,8 +128,8 @@ export default function BranchesPage() {
             staffCode: 'SAI-STF-001',
             fullName: 'Prakash Ramanathan',
             email: 'admin@saitravelservices.com',
-            role: UserRole.SUPER_ADMIN,
-            designation: 'Managing Director & Super Admin',
+            role: UserRole.OWNER,
+            designation: 'Managing Director & Owner',
             contactNumber: '+91 9894821561',
             isActive: true,
             createdAt: new Date().toISOString(),
@@ -141,9 +141,9 @@ export default function BranchesPage() {
             branchName: 'Madurai Head Office',
             staffCode: 'SAI-STF-002',
             fullName: 'Suresh Kumar',
-            email: 'manager.madurai@saitravelservices.com',
-            role: UserRole.BRANCH_MANAGER,
-            designation: 'Branch Operations Lead',
+            email: 'admin.madurai@saitravelservices.com',
+            role: UserRole.ADMIN,
+            designation: 'Branch Administrator',
             contactNumber: '+91 9790233711',
             isActive: true,
             createdAt: new Date().toISOString(),
@@ -155,9 +155,9 @@ export default function BranchesPage() {
             branchName: 'Trichy Branch Office',
             staffCode: 'SAI-STF-003',
             fullName: 'Kavitha Murugan',
-            email: 'manager.trichy@saitravelservices.com',
-            role: UserRole.BRANCH_MANAGER,
-            designation: 'Trichy Branch Manager',
+            email: 'admin.trichy@saitravelservices.com',
+            role: UserRole.ADMIN,
+            designation: 'Trichy Branch Admin',
             contactNumber: '+91 9894619921',
             isActive: true,
             createdAt: new Date().toISOString(),
@@ -183,9 +183,9 @@ export default function BranchesPage() {
             branchName: 'Madurai Head Office',
             staffCode: 'SAI-STF-005',
             fullName: 'Anitha Sundar',
-            email: 'auditor@saitravelservices.com',
-            role: UserRole.READ_ONLY,
-            designation: 'Statutory Compliance Auditor',
+            email: 'staff.madurai@saitravelservices.com',
+            role: UserRole.STAFF,
+            designation: 'Customer Service Executive',
             contactNumber: '+91 9894821561',
             isActive: true,
             createdAt: new Date().toISOString(),
@@ -463,10 +463,9 @@ export default function BranchesPage() {
               className="px-3 py-1.5 text-xs rounded-xl border border-slate-200 focus:outline-hidden focus:border-orange-500 text-slate-700 bg-white"
             >
               <option value="ALL">All Roles</option>
-              <option value={UserRole.SUPER_ADMIN}>Super Admin</option>
-              <option value={UserRole.BRANCH_MANAGER}>Branch Manager</option>
+              <option value={UserRole.OWNER}>Owner</option>
+              <option value={UserRole.ADMIN}>Admin</option>
               <option value={UserRole.STAFF}>Staff</option>
-              <option value={UserRole.READ_ONLY}>Read Only</option>
             </select>
           </div>
         </div>
@@ -488,25 +487,20 @@ export default function BranchesPage() {
             <tbody className="divide-y divide-slate-100">
               {filteredStaff.map((staff) => {
                 const roleBadges: Record<UserRole, { bg: string; text: string; label: string }> = {
-                  SUPER_ADMIN: {
+                  OWNER: {
+                    bg: 'bg-amber-100 text-amber-900 border-amber-300',
+                    text: 'text-amber-800',
+                    label: 'OWNER',
+                  },
+                  ADMIN: {
                     bg: 'bg-purple-100 text-purple-800 border-purple-200',
                     text: 'text-purple-800',
-                    label: 'SUPER ADMIN',
-                  },
-                  BRANCH_MANAGER: {
-                    bg: 'bg-amber-100 text-amber-800 border-amber-200',
-                    text: 'text-amber-800',
-                    label: 'BRANCH MANAGER',
+                    label: 'ADMIN',
                   },
                   STAFF: {
                     bg: 'bg-blue-100 text-blue-800 border-blue-200',
                     text: 'text-blue-800',
                     label: 'STAFF',
-                  },
-                  READ_ONLY: {
-                    bg: 'bg-slate-100 text-slate-800 border-slate-200',
-                    text: 'text-slate-800',
-                    label: 'READ ONLY',
                   },
                 };
                 const badge = roleBadges[staff.role] || roleBadges.STAFF;
@@ -807,16 +801,14 @@ export default function BranchesPage() {
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-orange-500 bg-white font-medium"
                   >
                     <option value={UserRole.STAFF}>Staff (CRM & Vault Access)</option>
-                    <option value={UserRole.BRANCH_MANAGER}>Branch Manager (Branch Admin)</option>
-                    <option value={UserRole.SUPER_ADMIN}>Super Admin (Global System Control)</option>
-                    <option value={UserRole.READ_ONLY}>Read Only (Auditor Access)</option>
+                    <option value={UserRole.ADMIN}>Admin (Branch Management & Review)</option>
                   </select>
                 </div>
               </div>
 
               {/* Role Scope Reminder */}
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 text-[11px] leading-relaxed">
-                <span className="font-bold text-slate-800">Least-Privilege RBAC Rule:</span> Staff accounts are strictly scoped to their assigned branch. Only Super Admins hold global cross-branch customer clearance.
+                <span className="font-bold text-slate-800">Least-Privilege RBAC Rule:</span> Staff accounts are strictly scoped to their assigned branch. Only the Owner holds global organizational authority and account management.
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">

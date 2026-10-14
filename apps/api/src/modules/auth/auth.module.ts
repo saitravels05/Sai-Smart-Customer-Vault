@@ -3,6 +3,8 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
+import { OwnerController } from './owner.controller';
+import { EmailService } from './email.service';
 import { JwtStrategy } from './jwt.strategy';
 import { TotpService } from './totp.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -17,9 +19,10 @@ import { BranchTenantGuard } from '../../common/guards/branch-tenant.guard';
       signOptions: { expiresIn: '15m' },
     }),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, OwnerController],
   providers: [
     AuthService,
+    EmailService,
     TotpService,
     JwtStrategy,
     JwtAuthGuard,
@@ -28,6 +31,7 @@ import { BranchTenantGuard } from '../../common/guards/branch-tenant.guard';
   ],
   exports: [
     AuthService,
+    EmailService,
     TotpService,
     JwtAuthGuard,
     RolesGuard,

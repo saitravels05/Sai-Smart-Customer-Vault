@@ -96,9 +96,9 @@ export class CustomersService {
     ipAddress = '127.0.0.1',
     userAgent = 'Unknown',
   ) {
-    // If not Super Admin, customer is strictly bound to user's assigned branch
+    // If not Owner, customer is strictly bound to user's assigned branch
     const branchId =
-      currentUser.role === UserRole.SUPER_ADMIN ? dto.branchId : currentUser.branchId!;
+      currentUser.role === UserRole.OWNER ? dto.branchId : currentUser.branchId!;
 
     if (!branchId) {
       throw new BadRequestException('Valid Branch ID is required');
@@ -200,8 +200,8 @@ export class CustomersService {
     try {
       const where: any = { isDeleted: false };
 
-      // Tenant Scoping: Super Admin can query any branch; other roles are strictly scoped
-      if (currentUser.role === UserRole.SUPER_ADMIN) {
+      // Tenant Scoping: Owner can query any branch; other roles are strictly scoped
+      if (currentUser.role === UserRole.OWNER) {
         if (filter.branchId) {
           where.branchId = filter.branchId;
         }
@@ -358,7 +358,7 @@ export class CustomersService {
 
     // Branch Access Check
     if (
-      currentUser.role !== UserRole.SUPER_ADMIN &&
+      currentUser.role !== UserRole.OWNER &&
       customer.branchId !== currentUser.branchId
     ) {
       throw new ForbiddenException(
@@ -805,7 +805,7 @@ export class CustomersService {
   async listAllBookings(user: AuthenticatedUser) {
     try {
       const branchWhere =
-        user.role === UserRole.SUPER_ADMIN || !user.branchId
+        user.role === UserRole.OWNER || !user.branchId
           ? {}
           : { customer: { branchId: user.branchId } };
 
@@ -941,8 +941,8 @@ export class CustomersService {
    * Merge duplicate customer into primary target customer
    */
   async mergeCustomers(targetCustomerId: string, dto: MergeCustomersDto, user: AuthenticatedUser) {
-    if (user.role !== UserRole.SUPER_ADMIN && user.role !== UserRole.BRANCH_MANAGER) {
-      throw new ForbiddenException('Merging customer profiles requires Branch Manager or Super Admin role.');
+    if (user.role !== UserRole.OWNER && user.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Merging customer profiles requires Admin or Owner role.');
     }
 
     const target = await this.getCustomerById(targetCustomerId, user);

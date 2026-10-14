@@ -137,21 +137,21 @@ describe('Phase 5 — Secure Document Vault & Watermarking Suite', () => {
       const docCustomerBranchId = maduraiBranchId;
 
       const isAllowed =
-        user.role === UserRole.SUPER_ADMIN || user.branchId === docCustomerBranchId;
+        user.role === UserRole.OWNER || user.branchId === docCustomerBranchId;
       assert.strictEqual(isAllowed, false);
     });
 
-    it('Super Admin must have global cross-branch clearance to access all documents', () => {
-      const superAdminUser: { userId: string; role: UserRole; branchId: string } = {
-        userId: 'admin-id',
-        role: UserRole.SUPER_ADMIN,
+    it('Owner must have global cross-branch clearance to access all documents', () => {
+      const ownerUser: { userId: string; role: UserRole; branchId: string } = {
+        userId: 'owner-id',
+        role: UserRole.OWNER,
         branchId: maduraiBranchId,
       };
       const anyBranchId = trichyBranchId;
 
       const isAllowed =
-        superAdminUser.role === UserRole.SUPER_ADMIN ||
-        superAdminUser.branchId === anyBranchId;
+        ownerUser.role === UserRole.OWNER ||
+        ownerUser.branchId === anyBranchId;
       assert.strictEqual(isAllowed, true);
     });
   });

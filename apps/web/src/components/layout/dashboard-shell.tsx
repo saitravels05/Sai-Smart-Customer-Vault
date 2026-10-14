@@ -1,20 +1,53 @@
 'use client';
 
-import React, { useState } from 'react';
-import { usePathname } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
 import { MobileBottomNav } from './mobile-bottom-nav';
+import { useAuth } from '@/context/auth-context';
+import { Loader2 } from 'lucide-react';
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+  const { isAuthenticated, isLoading } = useAuth();
 
-  // On authentication routes, render the auth screen directly without dashboard chrome
-  const isAuthRoute = pathname === '/login' || pathname === '/mfa';
+  // Authentication routes render directly without dashboard chrome
+  const isAuthRoute =
+    pathname === '/login' ||
+    pathname === '/signup' ||
+    pathname === '/forgot-password' ||
+    pathname === '/verify-otp' ||
+    pathname === '/reset-password' ||
+    pathname === '/mfa';
+
+  useEffect(() => {
+    if (!isLoading) {
+      if (!isAuthenticated && !isAuthRoute) {
+        // Safe internal redirect
+        router.replace('/login');
+      } else if (isAuthenticated && pathname === '/login') {
+        router.replace('/dashboard');
+      }
+    }
+  }, [isAuthenticated, isLoading, isAuthRoute, pathname, router]);
 
   if (isAuthRoute) {
     return <main className="w-full min-h-screen">{children}</main>;
+  }
+
+  // Prevent flash of protected dashboard content before authentication resolves
+  if (isLoading || !isAuthenticated) {
+    return (
+      <div className="w-full min-h-screen bg-[#0B192C] flex flex-col items-center justify-center p-4">
+        <Loader2 className="w-8 h-8 text-[#E85A18] animate-spin mb-3" />
+        <p className="text-xs text-slate-300 font-semibold tracking-wider uppercase">
+          Verifying Session Authorization...
+        </p>
+      </div>
+    );
   }
 
   return (

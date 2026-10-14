@@ -1,8 +1,20 @@
 export enum UserRole {
-  SUPER_ADMIN = 'SUPER_ADMIN',
-  BRANCH_MANAGER = 'BRANCH_MANAGER',
+  OWNER = 'OWNER',
+  ADMIN = 'ADMIN',
   STAFF = 'STAFF',
-  READ_ONLY = 'READ_ONLY',
+}
+
+export enum UserStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  PENDING = 'PENDING',
+  LOCKED = 'LOCKED',
+}
+
+export enum RegistrationStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
 }
 
 export enum Gender {

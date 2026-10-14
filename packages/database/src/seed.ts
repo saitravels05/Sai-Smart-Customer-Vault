@@ -56,41 +56,49 @@ async function main() {
   });
   console.log(`✅ Seeded Branch: ${trichyBranch.name} (${trichyBranch.code})`);
 
-  // 3. Seed Initial Super Admin (Argon2id hashed)
-  const defaultAdminEmail = 'admin@saitravelservices.com';
-  const existingAdmin = await prisma.user.findUnique({
-    where: { email: defaultAdminEmail },
+  // 3. Seed Primary Owner Account if INITIAL_OWNER_PASSWORD is provided
+  const ownerEmail = 'saipassportmdu@gmail.com';
+  const existingOwner = await prisma.user.findUnique({
+    where: { email: ownerEmail },
   });
 
-  if (!existingAdmin) {
-    const passwordHash = await argon2.hash('Admin@SaiVault2026!', {
-      type: argon2.argon2id,
-      memoryCost: 65536,
-      timeCost: 3,
-      parallelism: 4,
-    });
+  const initialOwnerPassword = process.env.INITIAL_OWNER_PASSWORD;
 
-    const adminUser = await prisma.user.create({
-      data: {
-        email: defaultAdminEmail,
-        passwordHash,
-        role: UserRole.SUPER_ADMIN,
-        isActive: true,
-        staffProfile: {
-          create: {
-            branchId: maduraiBranch.id,
-            staffCode: 'STAFF-ADMIN-01',
-            fullName: 'System Administrator',
-            designation: 'Super Administrator',
-            contactNumber: '+91 9894821561',
+  if (!existingOwner) {
+    if (initialOwnerPassword) {
+      const passwordHash = await argon2.hash(initialOwnerPassword, {
+        type: argon2.argon2id,
+        memoryCost: 65536,
+        timeCost: 3,
+        parallelism: 4,
+      });
+
+      const ownerUser = await prisma.user.create({
+        data: {
+          email: ownerEmail,
+          passwordHash,
+          role: UserRole.OWNER,
+          isActive: true,
+          mustChangePassword: true,
+          emailVerifiedAt: new Date(),
+          staffProfile: {
+            create: {
+              branchId: maduraiBranch.id,
+              staffCode: 'OWNER-01',
+              fullName: 'SAI Tours & Travels Owner',
+              designation: 'Managing Director / Owner',
+              contactNumber: '+91 9894821561',
+            },
           },
         },
-      },
-    });
+      });
 
-    console.log(`✅ Seeded Initial Super Admin: ${adminUser.email}`);
+      console.log(`✅ Initialized Primary Owner Account: ${ownerUser.email} (Role: OWNER, mustChangePassword: true)`);
+    } else {
+      console.log('ℹ️ INITIAL_OWNER_PASSWORD not set in environment. Skipping owner creation in seed.');
+    }
   } else {
-    console.log(`ℹ️ Super Admin already exists: ${existingAdmin.email}`);
+    console.log(`ℹ️ Primary Owner account already exists: ${existingOwner.email}. Preserving existing credentials.`);
   }
 
   console.log('✨ Baseline seed completed successfully. (ZERO dummy customer records created).');

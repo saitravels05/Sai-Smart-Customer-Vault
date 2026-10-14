@@ -89,11 +89,11 @@ export class BranchesService {
   }
 
   /**
-   * Create a new branch (Super Admin authorization required)
+   * Create a new branch (Owner authorization required)
    */
   async createBranch(dto: CreateBranchDto, user: AuthUserContext): Promise<BranchDto> {
-    if (user.role !== UserRole.SUPER_ADMIN) {
-      throw new ForbiddenException('Only Super Admin can register new branches.');
+    if (user.role !== UserRole.OWNER) {
+      throw new ForbiddenException('Only Owner can register new branches.');
     }
 
     const existing = await prisma.branch.findUnique({
@@ -194,7 +194,7 @@ export class BranchesService {
       const where: any = {};
       if (branchId) {
         where.branchId = branchId;
-      } else if (user && user.role !== UserRole.SUPER_ADMIN) {
+      } else if (user && user.role !== UserRole.OWNER) {
         where.branchId = user.branchId;
       }
 
@@ -226,15 +226,15 @@ export class BranchesService {
       this.logger.warn(`Database offline in getStaffMembers: ${err.message}. Returning default staff profile.`);
       return [
         {
-          id: 'admin-profile',
-          userId: 'admin-user-id',
+          id: 'owner-profile',
+          userId: 'owner-user-id',
           branchId: 'madurai-ho',
           branchName: 'Madurai Head Office',
-          staffCode: 'STF-001',
-          fullName: 'Super Administrator',
-          email: 'admin@saitravelservices.com',
-          role: UserRole.SUPER_ADMIN as any,
-          designation: 'Managing Director & Operations Head',
+          staffCode: 'OWNER-01',
+          fullName: 'SAI Tours & Travels Owner',
+          email: 'saipassportmdu@gmail.com',
+          role: UserRole.OWNER,
+          designation: 'Managing Director & Owner',
           contactNumber: '+91 9894821561',
           isActive: true,
           lastLoginAt: new Date().toISOString(),
@@ -248,13 +248,9 @@ export class BranchesService {
    * Provision a new staff member profile
    */
   async createStaffMember(dto: CreateStaffDto, user: AuthUserContext): Promise<StaffMemberDto> {
-    // Permission check: Super Admin can provision for any branch; Branch Manager can only provision for their own branch
-    if (user.role !== UserRole.SUPER_ADMIN && user.role !== UserRole.BRANCH_MANAGER) {
-      throw new ForbiddenException('Staff provisioning requires Branch Manager or Super Admin role.');
-    }
-
-    if (user.role === UserRole.BRANCH_MANAGER && user.branchId !== dto.branchId) {
-      throw new ForbiddenException('Branch Managers cannot provision staff for other branches.');
+    // Permission check: Only the Owner can create staff or admin accounts
+    if (user.role !== UserRole.OWNER) {
+      throw new ForbiddenException('Staff and Admin creation is restricted exclusively to the Owner.');
     }
 
     // Check duplicate email

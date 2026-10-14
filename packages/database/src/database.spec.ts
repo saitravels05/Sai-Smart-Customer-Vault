@@ -79,10 +79,9 @@ describe('Database Foundation & Field-Level Security Suite', () => {
 
   describe('Domain Enums and Models Alignment', () => {
     test('should expose all required organizational and service categories', () => {
-      assert.equal(UserRole.SUPER_ADMIN, 'SUPER_ADMIN');
-      assert.equal(UserRole.BRANCH_MANAGER, 'BRANCH_MANAGER');
+      assert.equal(UserRole.OWNER, 'OWNER');
+      assert.equal(UserRole.ADMIN, 'ADMIN');
       assert.equal(UserRole.STAFF, 'STAFF');
-      assert.equal(UserRole.READ_ONLY, 'READ_ONLY');
 
       assert.ok(Object.values(ServiceCategory).includes(ServiceCategory.PASSPORT_SERVICES));
       assert.ok(Object.values(ServiceCategory).includes(ServiceCategory.TOURIST_VISA));

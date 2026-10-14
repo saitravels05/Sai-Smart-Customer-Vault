@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import * as compression from 'compression';
+const cookieParser = require('cookie-parser');
 import { AppModule } from './app.module';
 import { validateEnv } from './config/env.config';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
@@ -15,7 +16,11 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
 
-  // Security Middleware
+  // Security & Cookie Middleware
+  const cookieMiddleware = typeof cookieParser === 'function' ? cookieParser : (cookieParser as any).default;
+  if (typeof cookieMiddleware === 'function') {
+    app.use(cookieMiddleware());
+  }
   app.use(helmet({
     crossOriginEmbedderPolicy: false,
     contentSecurityPolicy: {

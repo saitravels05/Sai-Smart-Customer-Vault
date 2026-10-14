@@ -74,17 +74,17 @@ describe('Phase 7 — AI Smart Search & Assistant Suite', () => {
 
       // Staff cannot query other branch
       const requestedBranchId = maduraiBranchId;
-      const isForbidden = requestedBranchId !== trichyStaff.branchId && trichyStaff.role !== UserRole.SUPER_ADMIN;
+      const isForbidden = requestedBranchId !== trichyStaff.branchId && trichyStaff.role !== UserRole.OWNER;
       assert.strictEqual(isForbidden, true);
 
-      // Super admin can query any branch
-      const superAdmin = {
-        userId: 'user-admin-01',
-        role: UserRole.SUPER_ADMIN,
+      // Owner can query any branch
+      const ownerUser = {
+        userId: 'user-owner-01',
+        role: UserRole.OWNER,
         branchId: maduraiBranchId,
       };
-      const superAdminForbidden = requestedBranchId !== superAdmin.branchId && superAdmin.role !== UserRole.SUPER_ADMIN;
-      assert.strictEqual(superAdminForbidden, false);
+      const ownerForbidden = requestedBranchId !== ownerUser.branchId && ownerUser.role !== UserRole.OWNER;
+      assert.strictEqual(ownerForbidden, false);
     });
   });
 

@@ -30,54 +30,31 @@ describe('Phase 9 — Advanced Dashboard, Analytics & Branch Management Suite', 
     const maduraiBranchId = '11111111-1111-1111-1111-111111111111';
     const trichyBranchId = '22222222-2222-2222-2222-222222222222';
 
-    it('should allow Super Admin to create branches and provision staff across any branch', () => {
-      const superAdmin = {
-        role: UserRole.SUPER_ADMIN,
+    it('should allow Owner to provision staff and admin accounts', () => {
+      const ownerUser = {
+        role: UserRole.OWNER,
         branchId: maduraiBranchId,
       };
 
-      const canCreateBranch = superAdmin.role === UserRole.SUPER_ADMIN;
-      assert.strictEqual(canCreateBranch, true);
-
-      const canProvisionTrichy =
-        superAdmin.role === UserRole.SUPER_ADMIN ||
-        (superAdmin.role === UserRole.BRANCH_MANAGER && superAdmin.branchId === trichyBranchId);
-      assert.strictEqual(canProvisionTrichy, true);
+      const canCreateAccounts = ownerUser.role === UserRole.OWNER;
+      assert.strictEqual(canCreateAccounts, true);
     });
 
-    it('should allow Branch Manager to provision staff only for their own branch', () => {
-      const trichyManager = {
-        role: UserRole.BRANCH_MANAGER,
+    it('should forbid Admin and Staff from creating accounts or changing roles', () => {
+      const adminUser = {
+        role: UserRole.ADMIN,
         branchId: trichyBranchId,
       };
-
-      const canProvisionTrichy =
-        trichyManager.role === UserRole.SUPER_ADMIN ||
-        (trichyManager.role === UserRole.BRANCH_MANAGER && trichyManager.branchId === trichyBranchId);
-      assert.strictEqual(canProvisionTrichy, true);
-
-      // Cannot provision for Madurai
-      const canProvisionMadurai =
-        trichyManager.role === UserRole.SUPER_ADMIN ||
-        (trichyManager.role === UserRole.BRANCH_MANAGER && trichyManager.branchId === maduraiBranchId);
-      assert.strictEqual(canProvisionMadurai, false);
-    });
-
-    it('should forbid Staff and Read-Only roles from creating staff profiles', () => {
       const staffUser = {
         role: UserRole.STAFF,
         branchId: maduraiBranchId,
       };
-      const readOnlyUser = {
-        role: UserRole.READ_ONLY,
-        branchId: maduraiBranchId,
-      };
 
-      const staffCanProvision = staffUser.role === UserRole.SUPER_ADMIN || staffUser.role === UserRole.BRANCH_MANAGER;
-      assert.strictEqual(staffCanProvision, false);
+      const adminCanCreateAccounts = adminUser.role === UserRole.OWNER;
+      assert.strictEqual(adminCanCreateAccounts, false);
 
-      const readOnlyCanProvision = readOnlyUser.role === UserRole.SUPER_ADMIN || readOnlyUser.role === UserRole.BRANCH_MANAGER;
-      assert.strictEqual(readOnlyCanProvision, false);
+      const staffCanCreateAccounts = staffUser.role === UserRole.OWNER;
+      assert.strictEqual(staffCanCreateAccounts, false);
     });
   });
 

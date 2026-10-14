@@ -93,10 +93,6 @@ export class SearchService {
 
     // --- Search Strategy B: Exact Passport Number Search (SHA-256 Hashed Lookup) ---
     if (intent.detectedEntities.passportNumber) {
-      // Security check: Only STAFF, BRANCH_MANAGER, and SUPER_ADMIN can search passport numbers
-      if (user.role === UserRole.READ_ONLY) {
-        throw new ForbiddenException('READ_ONLY accounts are not authorized to perform raw passport number lookups.');
-      }
 
       const pHash = hashSearchField(intent.detectedEntities.passportNumber);
       const passportMatches = await prisma.passport.findMany({
@@ -364,7 +360,7 @@ export class SearchService {
     requestedBranchId?: string,
     parsedBranchName?: string,
   ): string | undefined {
-    if (user.role === UserRole.SUPER_ADMIN) {
+    if (user.role === UserRole.OWNER) {
       if (requestedBranchId) return requestedBranchId;
       // If natural language specified branch (e.g., "Madurai" or "Trichy"), resolve branch ID
       if (parsedBranchName) {
