@@ -57,6 +57,24 @@ function signJwtToken(payload: Record<string, any>, expiresInSec = 86400): strin
   return `${header}.${body}.${signature}`;
 }
 
+function getAuthUser(req: NextRequest): any {
+  const authHeader = req.headers.get('authorization');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const verified = verifyJwtToken(authHeader);
+    if (verified) return verified;
+  }
+  const cookie = req.cookies.get('sai_session_token')?.value;
+  if (cookie) {
+    const verified = verifyJwtToken(`Bearer ${cookie}`);
+    if (verified) return verified;
+  }
+  return null;
+}
+
+function isValidUuid(id: string | null | undefined): boolean {
+  return typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+}
+
 // Resend Email Helper
 async function sendResendOtpEmail(toEmail: string, otpCode: string): Promise<boolean> {
   const apiKey = process.env.EMAIL_API_KEY || '';
@@ -449,7 +467,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
     // 8. CHANGE PASSWORD
     if (path === 'auth/change-password') {
-      const user = verifyJwtToken(req.headers.get('authorization'));
+      const user = getAuthUser(req);
       if (!user) {
         return NextResponse.json({ success: false, error: { message: 'Unauthorized' } }, { status: 401 });
       }
@@ -467,7 +485,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
     // 9. CREATE CUSTOMER
     if (path === 'customers') {
-      const user = verifyJwtToken(req.headers.get('authorization'));
+      const user = getAuthUser(req);
       if (!user) return NextResponse.json({ success: false, error: { message: 'Unauthorized' } }, { status: 401 });
 
       const body = await req.json();
@@ -490,9 +508,244 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       return NextResponse.json({ success: true, data: customer });
     }
 
+    // 10. REVOKE USER SESSIONS
+    const revokeMatch = path.match(/^owner\/users\/([^/]+)\/revoke-sessions$/);
+    if (revokeMatch) {
+      const authUser = getAuthUser(req);
+      if (!authUser || authUser.role !== 'OWNER') {
+        return NextResponse.json({ success: false, error: { message: 'Owner privileges required.' } }, { status: 403 });
+      }
+
+      const targetUserId = revokeMatch[1];
+      if (isValidUuid(targetUserId)) {
+        try {
+          await prisma.userSession.updateMany({
+            where: { userId: targetUserId, revokedAt: null },
+            data: { revokedAt: new Date() },
+          });
+          await prisma.user.update({
+            where: { id: targetUserId },
+            data: { currentSessionId: null },
+          }).catch(() => {});
+        } catch (err: any) {
+          console.warn('Revoke sessions warning:', err.message);
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'All user sessions have been terminated.',
+      });
+    }
+
+    // 11. APPROVE REGISTRATION REQUEST
+    const approveMatch = path.match(/^owner\/approvals\/([^/]+)\/approve$/);
+    if (approveMatch) {
+      const authUser = getAuthUser(req);
+      if (!authUser || authUser.role !== 'OWNER') {
+        return NextResponse.json({ success: false, error: { message: 'Owner privileges required.' } }, { status: 403 });
+      }
+
+      const requestId = approveMatch[1];
+      if (!isValidUuid(requestId)) {
+        return NextResponse.json({ success: false, error: { message: 'Invalid registration request ID.' } }, { status: 400 });
+      }
+
+      const body = await req.json().catch(() => ({}));
+      const assignedRole = body.role === 'ADMIN' ? 'ADMIN' : 'STAFF';
+
+      const regReq = await prisma.registrationRequest.findUnique({ where: { id: requestId } });
+      if (!regReq) {
+        return NextResponse.json({ success: false, error: { message: 'Registration request not found.' } }, { status: 404 });
+      }
+
+      const existing = await prisma.user.findUnique({ where: { email: regReq.applicantEmail.toLowerCase() } });
+      if (existing) {
+        await prisma.user.update({
+          where: { id: existing.id },
+          data: { role: assignedRole, isActive: true, status: 'ACTIVE' },
+        });
+        await prisma.registrationRequest.update({
+          where: { id: requestId },
+          data: {
+            status: 'APPROVED',
+            assignedRole,
+            approvedById: authUser.sub,
+            approvedAt: new Date(),
+          },
+        });
+        return NextResponse.json({ success: true, message: `User approved successfully as ${assignedRole}.` });
+      }
+
+      const defaultBranch =
+        (await prisma.branch.findFirst({ where: { isHeadOffice: true } })) ||
+        (await prisma.branch.findFirst());
+      const branchId = isValidUuid(regReq.branchId) ? regReq.branchId : defaultBranch?.id;
+
+      await prisma.$transaction(async (tx) => {
+        const newUser = await tx.user.create({
+          data: {
+            email: regReq.applicantEmail.toLowerCase(),
+            passwordHash: regReq.passwordHash,
+            role: assignedRole,
+            isActive: true,
+            status: 'ACTIVE',
+          },
+        });
+
+        if (branchId) {
+          const count = await tx.staffProfile.count();
+          await tx.staffProfile.create({
+            data: {
+              userId: newUser.id,
+              branchId,
+              staffCode: `STF-${String(count + 1).padStart(4, '0')}`,
+              fullName: regReq.fullName,
+              designation: assignedRole === 'ADMIN' ? 'Branch Manager' : 'Travel Operations Executive',
+              contactNumber: regReq.mobile,
+            },
+          });
+        }
+
+        await tx.registrationRequest.update({
+          where: { id: requestId },
+          data: {
+            status: 'APPROVED',
+            assignedRole,
+            approvedById: authUser.sub,
+            approvedAt: new Date(),
+          },
+        });
+      });
+
+      return NextResponse.json({ success: true, message: `User approved successfully as ${assignedRole}.` });
+    }
+
+    // 12. REJECT REGISTRATION REQUEST
+    const rejectMatch = path.match(/^owner\/approvals\/([^/]+)\/reject$/);
+    if (rejectMatch) {
+      const authUser = getAuthUser(req);
+      if (!authUser || authUser.role !== 'OWNER') {
+        return NextResponse.json({ success: false, error: { message: 'Owner privileges required.' } }, { status: 403 });
+      }
+
+      const requestId = rejectMatch[1];
+      if (!isValidUuid(requestId)) {
+        return NextResponse.json({ success: false, error: { message: 'Invalid registration request ID.' } }, { status: 400 });
+      }
+
+      const body = await req.json().catch(() => ({}));
+      await prisma.registrationRequest.update({
+        where: { id: requestId },
+        data: {
+          status: 'REJECTED',
+          rejectedAt: new Date(),
+          rejectionReason: body.reason || 'Application rejected by Owner discretion.',
+        },
+      });
+
+      return NextResponse.json({ success: true, message: 'Registration request rejected.' });
+    }
+
     return NextResponse.json({ error: { message: `Route not found: ${path}` } }, { status: 404 });
   } catch (error: any) {
     console.error(`API Error in ${path}:`, error);
+    return NextResponse.json({ success: false, error: { message: error.message || 'Internal Server Error' } }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: NextRequest, { params }: { params: { slug: string[] } }) {
+  const path = (params.slug || []).join('/');
+
+  try {
+    const authUser = getAuthUser(req);
+    if (!authUser || authUser.role !== 'OWNER') {
+      return NextResponse.json({ success: false, error: { message: 'Owner privileges required.' } }, { status: 403 });
+    }
+
+    // 1. UPDATE USER ROLE
+    const roleMatch = path.match(/^owner\/users\/([^/]+)\/role$/);
+    if (roleMatch) {
+      const targetUserId = roleMatch[1];
+      if (!isValidUuid(targetUserId)) {
+        return NextResponse.json({ success: false, error: { message: 'Invalid user ID.' } }, { status: 400 });
+      }
+
+      const body = await req.json();
+      const targetRole = body.role;
+
+      if (!targetRole || !['ADMIN', 'STAFF'].includes(targetRole)) {
+        return NextResponse.json(
+          { success: false, error: { message: 'Invalid role specified. Only ADMIN or STAFF can be assigned.' } },
+          { status: 400 },
+        );
+      }
+
+      const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
+      if (!targetUser) {
+        return NextResponse.json({ success: false, error: { message: 'User not found.' } }, { status: 404 });
+      }
+
+      if (targetUser.email === 'saipassportmdu@gmail.com' || targetUser.role === 'OWNER') {
+        return NextResponse.json(
+          { success: false, error: { message: 'The primary Owner account role cannot be modified.' } },
+          { status: 403 },
+        );
+      }
+
+      const updated = await prisma.user.update({
+        where: { id: targetUserId },
+        data: { role: targetRole },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `Role updated successfully to ${targetRole}.`,
+        data: { id: updated.id, role: updated.role },
+      });
+    }
+
+    // 2. UPDATE USER STATUS (ACTIVE / INACTIVE)
+    const statusMatch = path.match(/^owner\/users\/([^/]+)\/status$/);
+    if (statusMatch) {
+      const targetUserId = statusMatch[1];
+      if (!isValidUuid(targetUserId)) {
+        return NextResponse.json({ success: false, error: { message: 'Invalid user ID.' } }, { status: 400 });
+      }
+
+      const body = await req.json();
+      const isActive = Boolean(body.isActive);
+
+      const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
+      if (!targetUser) {
+        return NextResponse.json({ success: false, error: { message: 'User not found.' } }, { status: 404 });
+      }
+
+      if (targetUser.email === 'saipassportmdu@gmail.com' || targetUser.role === 'OWNER') {
+        return NextResponse.json(
+          { success: false, error: { message: 'The primary Owner account cannot be deactivated.' } },
+          { status: 403 },
+        );
+      }
+
+      const updated = await prisma.user.update({
+        where: { id: targetUserId },
+        data: {
+          isActive,
+          status: isActive ? 'ACTIVE' : 'INACTIVE',
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `User account ${isActive ? 'activated' : 'deactivated'} successfully.`,
+        data: { id: updated.id, isActive: updated.isActive },
+      });
+    }
+
+    return NextResponse.json({ error: { message: `Route not found: ${path}` } }, { status: 404 });
+  } catch (error: any) {
+    console.error(`API PATCH Error in ${path}:`, error);
     return NextResponse.json({ success: false, error: { message: error.message || 'Internal Server Error' } }, { status: 500 });
   }
 }
@@ -503,7 +756,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   try {
     // 1. AUTH ME
     if (path === 'auth/me') {
-      const user = verifyJwtToken(req.headers.get('authorization'));
+      const user = getAuthUser(req);
       if (!user) {
         return NextResponse.json({ success: false, error: { message: 'Unauthorized' } }, { status: 401 });
       }
@@ -517,18 +770,28 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
         return NextResponse.json({ success: false, error: { message: 'User not found' } }, { status: 404 });
       }
 
+      const isOwnerAcc = dbUser.role === 'OWNER' || dbUser.email === 'saipassportmdu@gmail.com';
+      const userPayload = {
+        id: dbUser.id,
+        email: dbUser.email,
+        role: dbUser.role,
+        mustChangePassword: dbUser.mustChangePassword,
+        fullName:
+          dbUser.staffProfile?.fullName ||
+          (isOwnerAcc ? 'SAI Tours & Travels Owner' : dbUser.email.split('@')[0]),
+        designation:
+          dbUser.staffProfile?.designation ||
+          (isOwnerAcc ? 'Managing Director / Owner' : 'Staff Member'),
+        branchId: dbUser.staffProfile?.branchId || '',
+        branchCode: dbUser.staffProfile?.branch?.code || 'IXM-HO',
+        branchName: dbUser.staffProfile?.branch?.name || (isOwnerAcc ? 'Madurai Head Office' : 'Branch'),
+      };
+
       return NextResponse.json({
         success: true,
         data: {
-          id: dbUser.id,
-          email: dbUser.email,
-          role: dbUser.role,
-          mustChangePassword: dbUser.mustChangePassword,
-          fullName: dbUser.staffProfile?.fullName || 'User',
-          designation: dbUser.staffProfile?.designation || '',
-          branchId: dbUser.staffProfile?.branchId || '',
-          branchCode: dbUser.staffProfile?.branch?.code || '',
-          branchName: dbUser.staffProfile?.branch?.name || '',
+          user: userPayload,
+          ...userPayload,
         },
       });
     }
@@ -607,6 +870,11 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 
     // 6. OWNER APPROVALS
     if (path === 'owner/approvals') {
+      const authUser = getAuthUser(req);
+      if (!authUser || authUser.role !== 'OWNER') {
+        return NextResponse.json({ success: false, error: { message: 'Owner privileges required.' } }, { status: 403 });
+      }
+
       const requests = await prisma.registrationRequest.findMany({
         where: { status: 'PENDING' },
         orderBy: { createdAt: 'desc' },
@@ -616,11 +884,40 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 
     // 7. OWNER USERS
     if (path === 'owner/users') {
+      const authUser = getAuthUser(req);
+      if (!authUser || authUser.role !== 'OWNER') {
+        return NextResponse.json({ success: false, error: { message: 'Owner privileges required.' } }, { status: 403 });
+      }
+
       const users = await prisma.user.findMany({
         include: { staffProfile: { include: { branch: true } } },
         orderBy: { createdAt: 'desc' },
       });
-      return NextResponse.json({ success: true, data: users });
+
+      const mappedUsers = users.map((u) => {
+        const isOwnerAcc = u.role === 'OWNER' || u.email === 'saipassportmdu@gmail.com';
+        const fullName =
+          u.staffProfile?.fullName ||
+          (isOwnerAcc ? 'SAI Tours & Travels Owner' : u.email.split('@')[0]);
+        const branchCode = u.staffProfile?.branch?.code || u.staffProfile?.branchId || 'IXM-HO';
+        const branchName =
+          u.staffProfile?.branch?.name || (branchCode === 'IXM-HO' ? 'Madurai Head Office' : 'Trichy Branch');
+
+        return {
+          id: u.id,
+          email: u.email,
+          fullName,
+          role: u.role,
+          branchId: branchCode,
+          branchName,
+          isActive: u.isActive,
+          status: u.isActive ? 'ACTIVE' : 'INACTIVE',
+          createdAt: u.createdAt.toISOString(),
+          lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
+        };
+      });
+
+      return NextResponse.json({ success: true, data: mappedUsers });
     }
 
     return NextResponse.json({ error: { message: `Route not found: ${path}` } }, { status: 404 });

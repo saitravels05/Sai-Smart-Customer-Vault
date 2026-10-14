@@ -55,7 +55,26 @@ export default function OwnerUsersPage() {
       setErrorNotice(null);
       const res: any = await apiClient.get('/owner/users');
       if (res && res.data) {
-        setUsers(res.data);
+        const rawUsers = Array.isArray(res.data) ? res.data : [];
+        const sanitized: ManagedUser[] = rawUsers.map((u: any) => ({
+          id: u.id,
+          email: u.email || '',
+          fullName:
+            u.fullName ||
+            u.staffProfile?.fullName ||
+            (u.role === 'OWNER' ? 'SAI Tours & Travels Owner' : u.email ? u.email.split('@')[0] : 'User'),
+          role: u.role || 'STAFF',
+          branchId: u.branchId || u.staffProfile?.branchId || u.staffProfile?.branch?.code || 'IXM-HO',
+          branchName:
+            u.branchName ||
+            u.staffProfile?.branch?.name ||
+            (u.role === 'OWNER' ? 'Madurai Head Office' : 'Branch'),
+          isActive: typeof u.isActive === 'boolean' ? u.isActive : true,
+          status: u.status || (u.isActive !== false ? 'ACTIVE' : 'INACTIVE'),
+          createdAt: u.createdAt || new Date().toISOString(),
+          lastLoginAt: u.lastLoginAt || null,
+        }));
+        setUsers(sanitized);
       }
     } catch (err: any) {
       setErrorNotice(err.message || 'Failed to fetch user directory.');
@@ -143,15 +162,20 @@ export default function OwnerUsersPage() {
   }
 
   // Filtered users
-  const filteredUsers = users.filter((u) => {
-    const matchesSearch =
-      u.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredUsers = (users || []).filter((u) => {
+    if (!u) return false;
+    const fullName = (u.fullName || u.email?.split('@')[0] || 'User').toLowerCase();
+    const email = (u.email || '').toLowerCase();
+    const query = (searchQuery || '').toLowerCase().trim();
+    const matchesSearch = !query || fullName.includes(query) || email.includes(query);
     const matchesRole = roleFilter === 'ALL' || u.role === roleFilter;
+    const branchIdStr = (u.branchId || '').toLowerCase();
+    const branchNameStr = (u.branchName || '').toLowerCase();
+    const filterBranchLower = (branchFilter || '').toLowerCase().trim();
     const matchesBranch =
       branchFilter === 'ALL' ||
-      u.branchId === branchFilter ||
-      (u.branchName && u.branchName.toLowerCase().includes(branchFilter.toLowerCase()));
+      branchIdStr.includes(filterBranchLower) ||
+      branchNameStr.includes(filterBranchLower);
     return matchesSearch && matchesRole && matchesBranch;
   });
 
@@ -271,7 +295,11 @@ export default function OwnerUsersPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredUsers.map((u) => {
-                  const isCurrentOwner = u.role === UserRole.OWNER;
+                  const isCurrentOwner =
+                    u.role === UserRole.OWNER ||
+                    u.role === 'OWNER' ||
+                    u.email === 'saipassportmdu@gmail.com';
+                  const initials = (u.fullName || u.email || 'US').trim().slice(0, 2).toUpperCase();
                   return (
                     <tr key={u.id} className="hover:bg-slate-50/50 transition">
                       {/* Name & Email */}
@@ -284,10 +312,10 @@ export default function OwnerUsersPage() {
                                 : 'bg-slate-100 text-slate-700'
                             }`}
                           >
-                            {isCurrentOwner ? <Crown className="w-3.5 h-3.5" /> : u.fullName.slice(0, 2).toUpperCase()}
+                            {isCurrentOwner ? <Crown className="w-3.5 h-3.5" /> : initials}
                           </div>
                           <div>
-                            <p className="font-bold text-slate-900">{u.fullName}</p>
+                            <p className="font-bold text-slate-900">{u.fullName || u.email || 'User'}</p>
                             <p className="text-[11px] text-slate-500">{u.email}</p>
                           </div>
                         </div>

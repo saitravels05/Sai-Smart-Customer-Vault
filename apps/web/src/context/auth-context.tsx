@@ -33,14 +33,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkSession = async (): Promise<AuthUserResponse | null> => {
     try {
       const res: any = await apiClient.get('/auth/me');
-      if (res && res.data && res.data.user) {
-        const u = res.data.user;
-        setUser(u);
-        setActiveBranchIdState(u.branchId || '');
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('sai_user_profile', JSON.stringify(u));
+      if (res && res.data) {
+        const u = res.data.user || res.data;
+        if (u && (u.id || u.email)) {
+          setUser(u);
+          setActiveBranchIdState(u.branchId || '');
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('sai_user_profile', JSON.stringify(u));
+          }
+          return u;
         }
-        return u;
       }
     } catch {
       // If server session check fails, check local fallback
