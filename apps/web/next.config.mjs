@@ -7,6 +7,23 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  async rewrites() {
+    const backendUrl = process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_URL;
+    if (backendUrl && backendUrl.startsWith('http')) {
+      const base = backendUrl.replace(/\/api\/v1\/?$/, '');
+      return [
+        {
+          source: '/api/v1/:path*',
+          destination: `${base}/api/v1/:path*`,
+        },
+        {
+          source: '/api/docs/:path*',
+          destination: `${base}/api/docs/:path*`,
+        },
+      ];
+    }
+    return [];
+  },
 };
 
 export default nextConfig;

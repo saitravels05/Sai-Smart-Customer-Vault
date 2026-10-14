@@ -9,7 +9,8 @@
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
     "clean": "turbo run clean",
-    "db:generate": "pnpm --filter @sai/database db:generate"
+    "db:generate": "pnpm --filter @sai/database db:generate",
+    "build:web": "turbo run build --filter=@sai/web..."
   },
   "devDependencies": {
     "turbo": "^2.0.4",
