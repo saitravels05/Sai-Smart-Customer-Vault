@@ -10,7 +10,7 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "build": "tsc",
+    "build": "prisma generate && tsc",
     "test": "node dist/database.spec.js",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf dist generated"
