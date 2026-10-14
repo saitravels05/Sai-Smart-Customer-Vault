@@ -21,10 +21,12 @@ generated/
 
 # Environment Variables & Secrets
 .env
+.env.*
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.env.vercel
 .vercel/
 *.pem
 *.key

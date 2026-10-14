@@ -7,6 +7,9 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  experimental: {
+    serverComponentsExternalPackages: ['argon2', '@prisma/client'],
+  },
   async rewrites() {
     const backendUrl = process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_URL;
     if (backendUrl && backendUrl.startsWith('http')) {

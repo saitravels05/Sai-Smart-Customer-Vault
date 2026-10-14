@@ -308,12 +308,18 @@ importers:
       '@hookform/resolvers':
         specifier: ^3.6.0
         version: 3.10.0(react-hook-form@7.89.0(@types/react@18.3.31)(react@18.3.1))
+      '@sai/database':
+        specifier: workspace:*
+        version: link:../../packages/database
       '@sai/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
       '@tanstack/react-query':
         specifier: ^5.45.0
         version: 5.104.1(react@18.3.1)
+      argon2:
+        specifier: ^0.40.3
+        version: 0.40.3
       axios:
         specifier: ^1.7.2
         version: 1.20.0(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)
