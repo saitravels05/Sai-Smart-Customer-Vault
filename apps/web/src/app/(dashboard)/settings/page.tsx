@@ -171,7 +171,7 @@ export default function SettingsPage() {
                   </label>
                   <input
                     type="email"
-                    defaultValue="madurai@saitravelservices.com"
+                    defaultValue="saipassportmdu@gmail.com"
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#E85A18]"
                   />
                 </div>
@@ -182,7 +182,7 @@ export default function SettingsPage() {
                   </label>
                   <input
                     type="text"
-                    defaultValue="SAI Tours & Travels, Main Road, Madurai, Tamil Nadu 625001"
+                    defaultValue="4/166, Melakkal Main Road, Opp: Fenner India, Kochadai, Madurai – 16"
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#E85A18]"
                   />
                 </div>
@@ -228,7 +228,7 @@ export default function SettingsPage() {
                   </label>
                   <input
                     type="email"
-                    defaultValue="trichy@saitravelservices.com"
+                    defaultValue="saipassporttry@gmail.com"
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#E85A18]"
                   />
                 </div>
@@ -239,7 +239,7 @@ export default function SettingsPage() {
                   </label>
                   <input
                     type="text"
-                    defaultValue="SAI Tours & Travels, Cantonment, Tiruchirappalli (Trichy), Tamil Nadu 620001"
+                    defaultValue="No.4, 75/A, Jothi Complex, Nee Road, Thillai Nagar, Trichy – 18"
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#E85A18]"
                   />
                 </div>

@@ -32,6 +32,8 @@ export interface TranslationDictionary {
     trichyAddress: string;
     maduraiPhone: string;
     trichyPhone: string;
+    maduraiEmail: string;
+    trichyEmail: string;
     allBranches: string;
     switchBranch: string;
   };

@@ -703,9 +703,9 @@ export default function DashboardPage() {
                   HEAD OFFICE
                 </span>
               </div>
-              <p className="text-xs text-slate-600">Address: No. 12, West Veli Street, Madurai, TN 625001</p>
+              <p className="text-xs text-slate-600">Address: 4/166, Melakkal Main Road, Opp: Fenner India, Kochadai, Madurai – 16</p>
               <p className="text-xs text-slate-600">Contact: <strong className="text-slate-800">+91 9894821561</strong></p>
-              <p className="text-xs text-slate-600">Passport Enquiry: <strong className="text-slate-800">+91 9790233711</strong></p>
+              <p className="text-xs text-slate-600">Email: <strong className="text-slate-800">saipassportmdu@gmail.com</strong></p>
               <div className="pt-2 text-[11px] text-slate-500 flex items-center gap-1.5 border-t border-slate-200">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Super Admin Global Clearances Armed</span>
@@ -719,9 +719,9 @@ export default function DashboardPage() {
                   BRANCH
                 </span>
               </div>
-              <p className="text-xs text-slate-600">Address: No. 45, Convent Road, Cantonment, Trichy, TN 620001</p>
+              <p className="text-xs text-slate-600">Address: No.4, 75/A, Jothi Complex, Nee Road, Thillai Nagar, Trichy – 18</p>
               <p className="text-xs text-slate-600">Contact: <strong className="text-slate-800">+91 9894619921</strong></p>
-              <p className="text-xs text-slate-600">Ticket Enquiry: <strong className="text-slate-800">+91 9600421561</strong></p>
+              <p className="text-xs text-slate-600">Email: <strong className="text-slate-800">saipassporttry@gmail.com</strong></p>
               <div className="pt-2 text-[11px] text-slate-500 flex items-center gap-1.5 border-t border-slate-200">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Isolated Branch Staff & Client Vault</span>

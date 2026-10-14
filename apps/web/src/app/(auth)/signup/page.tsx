@@ -211,7 +211,7 @@ export default function SignupRequestPage() {
                         className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E85A18] transition bg-white"
                       >
                         <option value="IXM-HO">Madurai Head Office (IXM-HO)</option>
-                        <option value="TRZ-BR">Trichy Branch Office (TRZ-BR)</option>
+                        <option value="TRZ-BO">Trichy Branch Office (TRZ-BO)</option>
                       </select>
                     </div>
                   </div>
