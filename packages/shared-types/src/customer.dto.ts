@@ -18,6 +18,14 @@ export const createCustomerSchema = z.object({
   country: z.string().max(60).default('India'),
   primaryCategory: z.nativeEnum(ServiceCategory).default(ServiceCategory.PASSPORT_SERVICES),
   notes: z.string().max(2000).optional().nullable(),
+  // Travel & Financial Calculations
+  registrationDate: z.string().optional().nullable(),
+  travelDate: z.string().optional().nullable(),
+  departure: z.string().max(100).optional().nullable(),
+  arrival: z.string().max(100).optional().nullable(),
+  customerAmount: z.coerce.number().min(0).optional().nullable(),
+  agentAmount: z.coerce.number().min(0).optional().nullable(),
+  serviceCharge: z.coerce.number().optional().nullable(),
   // Initial consent flag per DPDPA
   consentGranted: z.boolean().default(true),
 });
@@ -56,6 +64,13 @@ export interface CustomerSummaryDto {
   branchName: string;
   branchCode: string;
   registeredAt: string;
+  registrationDate?: string | null;
+  travelDate?: string | null;
+  departure?: string | null;
+  arrival?: string | null;
+  customerAmount?: number | null;
+  agentAmount?: number | null;
+  serviceCharge?: number | null;
   documentCount: number;
 }
 

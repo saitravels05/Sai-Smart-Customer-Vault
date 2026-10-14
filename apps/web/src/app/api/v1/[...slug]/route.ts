@@ -512,6 +512,28 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       return NextResponse.json({ success: true, message: 'Password updated successfully' });
     }
 
+    // 8.5 CHECK DUPLICATE CUSTOMER
+    if (path === 'customers/check-duplicate') {
+      const body = await req.json().catch(() => ({}));
+      const phone = (body.primaryPhone || '').trim();
+      if (!phone || phone.length < 8) {
+        return NextResponse.json({ success: true, data: { hasDuplicate: false, duplicates: [] } });
+      }
+
+      const duplicates = await prisma.customer.findMany({
+        where: { primaryPhone: phone, isDeleted: false },
+        include: { branch: true },
+      });
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          hasDuplicate: duplicates.length > 0,
+          duplicates,
+        },
+      });
+    }
+
     // 9. CREATE CUSTOMER
     if (path === 'customers') {
       const user = getAuthUser(req);
@@ -521,16 +543,50 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       const customerCount = await prisma.customer.count();
       const customerNumber = `SAI-${String(customerCount + 1).padStart(5, '0')}`;
 
+      // Calculate service charge (profit): Customer Amount - Agent Amount
+      const customerAmount = body.customerAmount !== undefined && body.customerAmount !== '' ? Number(body.customerAmount) : 0;
+      const agentAmount = body.agentAmount !== undefined && body.agentAmount !== '' ? Number(body.agentAmount) : 0;
+      const serviceCharge = customerAmount - agentAmount;
+
+      let branchId = body.branchId;
+      if (!isValidUuid(branchId)) {
+        if (isValidUuid(user.branchId)) {
+          branchId = user.branchId;
+        } else {
+          const defaultBranch =
+            (await prisma.branch.findFirst({ where: { isHeadOffice: true } })) ||
+            (await prisma.branch.findFirst());
+          branchId = defaultBranch?.id;
+        }
+      }
+
       const customer = await prisma.customer.create({
         data: {
           customerNumber,
-          branchId: body.branchId || user.branchId,
+          branchId,
           fullName: body.fullName,
+          dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : null,
+          gender: body.gender || 'UNSPECIFIED',
+          nationality: body.nationality || 'Indian',
           primaryPhone: body.primaryPhone,
-          email: body.email || null,
           whatsappNumber: body.whatsappNumber || null,
+          email: body.email || null,
+          addressLine: body.addressLine || null,
+          city: body.city || null,
+          state: body.state || 'Tamil Nadu',
+          country: body.country || 'India',
           primaryCategory: body.primaryCategory || 'PASSPORT_SERVICES',
           status: 'ACTIVE',
+          notes: body.notes || null,
+
+          // Travel & Financial Calculations
+          registrationDate: body.registrationDate ? new Date(body.registrationDate) : new Date(),
+          travelDate: body.travelDate ? new Date(body.travelDate) : null,
+          departure: body.departure || null,
+          arrival: body.arrival || null,
+          customerAmount,
+          agentAmount,
+          serviceCharge,
         },
       });
 
@@ -827,41 +883,151 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 
     // 2. DASHBOARD STATS & ANALYTICS
     if (path === 'dashboard/stats') {
-      const [totalCustomers, activePassports, activeVisas, pendingReminders] = await Promise.all([
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const in180Days = new Date(now.getTime() + 180 * 86400000);
+      const in90Days = new Date(now.getTime() + 90 * 86400000);
+      const in7Days = new Date(now.getTime() + 7 * 86400000);
+
+      const [
+        totalCustomers,
+        newCustomersThisMonth,
+        activeCustomers,
+        totalDocuments,
+        pendingAiDocuments,
+        expiringPassports180Days,
+        expiringVisas90Days,
+        upcomingTravelDepartures,
+        activeBranchesCount,
+        financialAgg,
+      ] = await Promise.all([
         prisma.customer.count({ where: { isDeleted: false } }),
-        prisma.passport.count({ where: { isCurrent: true } }),
-        prisma.visa.count({ where: { status: 'ACTIVE' } }),
-        prisma.reminder.count({ where: { status: 'SCHEDULED' } }),
+        prisma.customer.count({ where: { isDeleted: false, createdAt: { gte: startOfMonth } } }),
+        prisma.customer.count({ where: { isDeleted: false, status: 'ACTIVE' } }),
+        prisma.document.count({ where: { isDeleted: false } }).catch(() => 0),
+        prisma.aIProcessingJob.count({ where: { status: 'PENDING' } }).catch(() => 0),
+        prisma.passport.count({ where: { isCurrent: true, expiryDate: { lte: in180Days, gte: now } } }).catch(() => 0),
+        prisma.visa.count({ where: { status: 'ACTIVE', expiryDate: { lte: in90Days, gte: now } } }).catch(() => 0),
+        prisma.customer.count({ where: { isDeleted: false, travelDate: { lte: in7Days, gte: now } } }).catch(() => 0),
+        prisma.branch.count({ where: { isActive: true } }),
+        prisma.customer.aggregate({
+          where: { isDeleted: false },
+          _sum: { customerAmount: true, agentAmount: true, serviceCharge: true },
+        }),
       ]);
+
+      const totalCustomerRevenue = Number(financialAgg._sum.customerAmount || 0);
+      const totalAgentCost = Number(financialAgg._sum.agentAmount || 0);
+      const totalServiceCharge = Number(financialAgg._sum.serviceCharge || 0);
 
       return NextResponse.json({
         success: true,
         data: {
           totalCustomers,
-          activePassports,
-          activeVisas,
-          pendingReminders,
-          storageBytesUsed: 0,
+          newCustomersThisMonth,
+          activeCustomers,
+          totalDocuments,
+          pendingAiDocuments,
+          expiringPassports180Days,
+          expiringVisas90Days,
+          upcomingTravelDepartures,
+          totalStorageBytes: 0,
+          totalStorageFormatted: '0 MB',
+          activeBranchesCount,
+          totalCustomerRevenue,
+          totalAgentCost,
+          totalServiceCharge,
         },
       });
     }
 
     if (path === 'dashboard/analytics') {
+      const branches = await prisma.branch.findMany({ where: { isActive: true } });
+      const [categoryGroups, totalCust] = await Promise.all([
+        prisma.customer.groupBy({
+          by: ['primaryCategory'],
+          where: { isDeleted: false },
+          _count: { _all: true },
+          _sum: { serviceCharge: true },
+        }),
+        prisma.customer.count({ where: { isDeleted: false } }),
+      ]);
+
+      const categoryLabels: Record<string, string> = {
+        PASSPORT_SERVICES: 'Passport Services',
+        TOURIST_VISA: 'Tourist Visa',
+        BUSINESS_VISA: 'Business Visa',
+        FLIGHT_BOOKING: 'Flight Booking',
+        TRAIN_TICKET: 'Train Ticket',
+        FERRY_TICKET: 'Ferry Ticket',
+        BUS_TICKET: 'Bus Ticket',
+        HOTEL_BOOKING: 'Hotel Booking',
+        TOUR_PACKAGES: 'Tour Packages',
+        CERTIFICATE_ATTESTATION: 'Certificate Attestation',
+        GAZETTE_SERVICES: 'Gazette Services',
+        TRANSPORT_RENTALS: 'Transport Rentals',
+        OTHER_TRAVEL_SERVICES: 'Other Travel Services',
+      };
+
+      const serviceCategoryBreakdown = categoryGroups.map((g) => ({
+        category: categoryLabels[g.primaryCategory] || g.primaryCategory.replace(/_/g, ' '),
+        count: g._count._all,
+        percentage: totalCust > 0 ? Math.round((g._count._all / totalCust) * 100) : 0,
+        totalProfit: Number(g._sum.serviceCharge || 0),
+      }));
+
+      if (serviceCategoryBreakdown.length === 0) {
+        serviceCategoryBreakdown.push(
+          { category: 'Passport Services', count: 0, percentage: 0, totalProfit: 0 },
+          { category: 'Tourist Visa', count: 0, percentage: 0, totalProfit: 0 },
+          { category: 'Flight Booking', count: 0, percentage: 0, totalProfit: 0 },
+          { category: 'Train Ticket', count: 0, percentage: 0, totalProfit: 0 },
+          { category: 'Ferry Ticket', count: 0, percentage: 0, totalProfit: 0 },
+          { category: 'Bus Ticket', count: 0, percentage: 0, totalProfit: 0 },
+        );
+      }
+
+      const branchActivity = await Promise.all(
+        branches.map(async (b) => {
+          const [cCount, dCount] = await Promise.all([
+            prisma.customer.count({ where: { branchId: b.id, isDeleted: false } }),
+            prisma.document.count({ where: { branchId: b.id, isDeleted: false } }).catch(() => 0),
+          ]);
+          return {
+            branchId: b.id,
+            branchCode: b.code,
+            branchName: b.name,
+            customerCount: cCount,
+            documentCount: dCount,
+          };
+        }),
+      );
+
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const now = new Date();
+      const monthlyRegistrations = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const mName = months[d.getMonth()];
+        const nextD = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+        const count = await prisma.customer.count({
+          where: {
+            isDeleted: false,
+            createdAt: { gte: d, lt: nextD },
+          },
+        });
+        monthlyRegistrations.push({ month: mName, count });
+      }
+
       return NextResponse.json({
         success: true,
         data: {
-          monthlyTrend: [
-            { month: 'Jan', customers: 12 },
-            { month: 'Feb', customers: 18 },
-            { month: 'Mar', customers: 24 },
-            { month: 'Apr', customers: 30 },
-          ],
-          servicesBreakdown: [
-            { category: 'PASSPORT_SERVICES', count: 45 },
-            { category: 'TOURIST_VISA', count: 30 },
-            { category: 'FLIGHT_BOOKING', count: 20 },
-            { category: 'HOTEL_BOOKING', count: 15 },
-          ],
+          monthlyRegistrations,
+          serviceCategoryBreakdown,
+          branchActivity,
+          documentTypeBreakdown: [],
+          expiryUrgencyBreakdown: { critical7d: 0, urgent30d: 0, warning180d: 0, expired: 0 },
+          repeatCustomerStats: { singleServiceCount: totalCust, multiServiceCount: 0, repeatCustomerRate: 0 },
         },
       });
     }
@@ -877,14 +1043,67 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       return NextResponse.json({ success: true, data: staff });
     }
 
-    // 4. CUSTOMERS LIST
+    // 4. CUSTOMERS LIST & DETAIL
     if (path === 'customers') {
       const customers = await prisma.customer.findMany({
         where: { isDeleted: false },
         take: 50,
         orderBy: { createdAt: 'desc' },
+        include: { branch: true },
       });
-      return NextResponse.json({ success: true, data: customers, meta: { total: customers.length, page: 1, limit: 50 } });
+      const mapped = customers.map((c) => ({
+        ...c,
+        customerAmount: Number(c.customerAmount || 0),
+        agentAmount: Number(c.agentAmount || 0),
+        serviceCharge: Number(c.serviceCharge || 0),
+        branchName: c.branch?.name || 'Madurai Head Office',
+        branchCode: c.branch?.code || 'IXM-HO',
+      }));
+      return NextResponse.json({ success: true, data: mapped, meta: { total: customers.length, page: 1, limit: 50 } });
+    }
+
+    const customerMatch = path.match(/^customers\/([^/]+)$/);
+    if (customerMatch) {
+      const custId = customerMatch[1];
+      const customer = await prisma.customer.findFirst({
+        where: { id: custId, isDeleted: false },
+        include: {
+          branch: true,
+          passports: true,
+          visas: true,
+          documents: true,
+          bookings: true,
+        },
+      });
+      if (!customer) {
+        return NextResponse.json({ success: false, error: { message: 'Customer profile not found' } }, { status: 404 });
+      }
+      return NextResponse.json({
+        success: true,
+        data: {
+          ...customer,
+          customerAmount: Number(customer.customerAmount || 0),
+          agentAmount: Number(customer.agentAmount || 0),
+          serviceCharge: Number(customer.serviceCharge || 0),
+          branchName: customer.branch?.name || 'Madurai Head Office',
+          branchCode: customer.branch?.code || 'IXM-HO',
+        },
+      });
+    }
+
+    const duplicatesMatch = path.match(/^customers\/([^/]+)\/duplicates$/);
+    if (duplicatesMatch) {
+      return NextResponse.json({ success: true, data: [] });
+    }
+
+    const timelineMatch = path.match(/^customers\/([^/]+)\/timeline$/);
+    if (timelineMatch) {
+      return NextResponse.json({ success: true, data: { timeline: [] } });
+    }
+
+    const consentsMatch = path.match(/^compliance\/customers\/([^/]+)\/consents$/);
+    if (consentsMatch) {
+      return NextResponse.json({ success: true, data: [] });
     }
 
     // 5. REMINDERS LIST

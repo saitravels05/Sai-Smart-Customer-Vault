@@ -63,6 +63,9 @@ export default function CustomersDirectoryPage() {
     { label: 'Tourist Visa', value: ServiceCategory.TOURIST_VISA },
     { label: 'Business Visa', value: ServiceCategory.BUSINESS_VISA },
     { label: 'Flight Booking', value: ServiceCategory.FLIGHT_BOOKING },
+    { label: 'Train Ticket', value: ServiceCategory.TRAIN_TICKET },
+    { label: 'Ferry Ticket', value: ServiceCategory.FERRY_TICKET },
+    { label: 'Bus Ticket', value: ServiceCategory.BUS_TICKET },
     { label: 'Tour Packages', value: ServiceCategory.TOUR_PACKAGES },
     { label: 'Attestation', value: ServiceCategory.CERTIFICATE_ATTESTATION },
   ];
@@ -77,7 +80,7 @@ export default function CustomersDirectoryPage() {
             <span>Customer Management CRM</span>
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Real customer directory with branch tenancy isolation and statutory compliance.
+            Real customer directory with travel itineraries, real-time profit calculations, and branch tenancy isolation.
           </p>
         </div>
         <Link
@@ -98,7 +101,7 @@ export default function CustomersDirectoryPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by customer name, mobile number, or Customer ID (SAI-2026-XXXX)..."
+              placeholder="Search by customer name, mobile number, or Customer ID (SAI-XXXXX)..."
               className="w-full pl-9 pr-4 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E85A18] transition"
             />
           </div>
@@ -169,8 +172,9 @@ export default function CustomersDirectoryPage() {
                   <th className="py-3 px-4">Full Name</th>
                   <th className="py-3 px-4">Contact</th>
                   <th className="py-3 px-4">Primary Service</th>
+                  <th className="py-3 px-4">Travel / Route</th>
+                  <th className="py-3 px-4">Profit (Service Charge)</th>
                   <th className="py-3 px-4">Branch</th>
-                  <th className="py-3 px-4">Documents</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
@@ -203,14 +207,36 @@ export default function CustomersDirectoryPage() {
                       </span>
                     </td>
                     <td className="py-3 px-4">
-                      <span className="text-[11px] font-medium text-slate-800">
-                        {c.branchName}
-                      </span>
+                      {c.departure || c.arrival ? (
+                        <div className="space-y-0.5">
+                          <span className="font-semibold text-slate-800">
+                            {c.departure || '—'} → {c.arrival || '—'}
+                          </span>
+                          {c.travelDate && (
+                            <p className="text-[10px] text-slate-400">
+                              {new Date(c.travelDate).toLocaleDateString('en-IN')}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
                     </td>
                     <td className="py-3 px-4">
-                      <span className="inline-flex items-center gap-1 text-slate-600 text-xs">
-                        <FolderLock className="w-3.5 h-3.5 text-slate-400" />
-                        <span>{c.documentCount || 0}</span>
+                      <div className="space-y-0.5">
+                        <span className="font-mono font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                          ₹{(Number(c.serviceCharge) || 0).toLocaleString('en-IN')}
+                        </span>
+                        {(c.customerAmount > 0 || c.agentAmount > 0) && (
+                          <p className="text-[9px] text-slate-400">
+                            ₹{Number(c.customerAmount || 0).toLocaleString('en-IN')} − ₹{Number(c.agentAmount || 0).toLocaleString('en-IN')}
+                          </p>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="text-[11px] font-medium text-slate-800">
+                        {c.branchName}
                       </span>
                     </td>
                     <td className="py-3 px-4">

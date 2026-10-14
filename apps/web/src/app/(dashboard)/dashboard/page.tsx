@@ -261,6 +261,93 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Executive Financial Performance & Service Charge Profit Panel */}
+      <div className="bg-gradient-to-r from-slate-900 via-[#0B192C] to-slate-900 rounded-2xl p-5 border border-slate-800 text-white shadow-lg space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+              <TrendingUp className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-white tracking-tight flex flex-wrap items-center gap-2">
+                <span>{isTamil ? 'நிதி வருவாய் & சேவை கட்டண லாபம்' : 'Financial Revenue & Service Charge Profit Ledger'}</span>
+                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Customer Amount − Agent Amount = Service Charge
+                </span>
+              </h2>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                {isTamil
+                  ? 'நிகர நிறுவன லாபம் வாடிக்கையாளர் கட்டணம் மற்றும் முகவர் செலவுகளின் அடிப்படையில் தானாக கணக்கிடப்படுகிறது.'
+                  : 'Agency net profit (Service Charge) calculated in real time across Madurai Head Office & Trichy Branch.'}
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/customers/new"
+            className="inline-flex items-center gap-1.5 text-xs text-orange-400 hover:text-orange-300 font-semibold self-start sm:self-auto"
+          >
+            <span>+ New Customer & Booking Entry</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Total Service Charge (Profit) */}
+          <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-xl p-4 relative overflow-hidden">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-semibold text-emerald-300">
+                {isTamil ? 'மொத்த சேவை கட்டணம் (நிகர லாபம்)' : 'Total Service Charge (Net Profit)'}
+              </span>
+              <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-emerald-500/30 text-emerald-200">
+                PROFIT
+              </span>
+            </div>
+            <p className="text-2xl lg:text-3xl font-black text-emerald-400 font-mono tracking-tight">
+              ₹{(kpis?.totalServiceCharge ?? 0).toLocaleString('en-IN')}
+            </p>
+            <p className="text-[11px] text-emerald-300/80 mt-1">
+              {isTamil ? 'நிகர லாபத் தொகை' : 'Formula: Customer Amount − Agent Amount'}
+            </p>
+          </div>
+
+          {/* Customer Amount (Revenue) */}
+          <div className="bg-slate-800/50 border border-slate-700/80 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-semibold text-slate-300">
+                {isTamil ? 'மொத்த வாடிக்கையாளர் தொகை' : 'Total Customer Receivable'}
+              </span>
+              <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">
+                GROSS
+              </span>
+            </div>
+            <p className="text-2xl lg:text-3xl font-black text-white font-mono tracking-tight">
+              ₹{(kpis?.totalCustomerRevenue ?? 0).toLocaleString('en-IN')}
+            </p>
+            <p className="text-[11px] text-slate-400 mt-1">
+              {isTamil ? 'வாடிக்கையாளரிடமிருந்து பெறப்பட்ட தொகை' : 'Total customer booking collections'}
+            </p>
+          </div>
+
+          {/* Agent Amount (Outflow Cost) */}
+          <div className="bg-slate-800/50 border border-slate-700/80 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-semibold text-slate-300">
+                {isTamil ? 'மொத்த முகவர் செலவு' : 'Total Agent / Vendor Cost'}
+              </span>
+              <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">
+                PAYABLE
+              </span>
+            </div>
+            <p className="text-2xl lg:text-3xl font-black text-slate-200 font-mono tracking-tight">
+              ₹{(kpis?.totalAgentCost ?? 0).toLocaleString('en-IN')}
+            </p>
+            <p className="text-[11px] text-slate-400 mt-1">
+              {isTamil ? 'டிக்கெட்/விசா முகவர் செலவு' : 'Airlines, train, ferry & vendor ticket costs'}
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* 8 Primary Executive KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Total Customers */}
@@ -489,10 +576,20 @@ export default function DashboardPage() {
                 'Passport Services': 'bg-blue-600',
                 'VISA': 'bg-orange-500',
                 'Visa Processing': 'bg-orange-500',
+                'Tourist Visa': 'bg-orange-500',
+                'Business Visa': 'bg-amber-600',
                 'FLIGHT TICKET': 'bg-sky-500',
+                'Flight Booking': 'bg-sky-500',
                 'Flight Tickets': 'bg-sky-500',
+                'Train Ticket': 'bg-emerald-600',
+                'Ferry Ticket': 'bg-teal-500',
+                'Bus Ticket': 'bg-indigo-500',
+                'Hotel Booking': 'bg-purple-500',
                 'TOUR PACKAGE': 'bg-emerald-500',
                 'Tour Packages': 'bg-emerald-500',
+                'Certificate Attestation': 'bg-rose-500',
+                'Gazette Services': 'bg-pink-500',
+                'Transport Rentals': 'bg-yellow-500',
               };
               return (
                 <div key={cat.category} className="space-y-1">
@@ -500,9 +597,16 @@ export default function DashboardPage() {
                     <span className="font-semibold text-slate-700">
                       {cat.category}
                     </span>
-                    <span className="text-slate-500 text-[11px]">
-                      {cat.count} clients ({cat.percentage}%)
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {cat.totalProfit !== undefined && cat.totalProfit > 0 && (
+                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                          Profit: ₹{cat.totalProfit.toLocaleString('en-IN')}
+                        </span>
+                      )}
+                      <span className="text-slate-500 text-[11px]">
+                        {cat.count} clients ({cat.percentage}%)
+                      </span>
+                    </div>
                   </div>
                   <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                     <div

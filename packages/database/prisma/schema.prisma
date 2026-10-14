@@ -47,6 +47,9 @@ enum ServiceCategory {
   TOURIST_VISA
   BUSINESS_VISA
   FLIGHT_BOOKING
+  TRAIN_TICKET
+  FERRY_TICKET
+  BUS_TICKET
   HOTEL_BOOKING
   TOUR_PACKAGES
   CERTIFICATE_ATTESTATION
@@ -298,6 +301,14 @@ model Customer {
   primaryCategory ServiceCategory    @default(PASSPORT_SERVICES)
   status          CustomerStatus     @default(ACTIVE)
   notes           String?            @db.Text
+
+  registrationDate DateTime?         @default(now()) @db.Date
+  travelDate       DateTime?         @db.Date
+  departure        String?           @db.VarChar(100)
+  arrival          String?           @db.VarChar(100)
+  customerAmount   Decimal?          @default(0) @db.Decimal(12, 2)
+  agentAmount      Decimal?          @default(0) @db.Decimal(12, 2)
+  serviceCharge    Decimal?          @default(0) @db.Decimal(12, 2)
 
   registeredAt    DateTime           @default(now()) @db.Timestamptz(6)
   archivedAt      DateTime?          @db.Timestamptz(6)

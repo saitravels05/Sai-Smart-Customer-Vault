@@ -480,90 +480,198 @@ export default function CustomerProfilePage() {
 
       {/* Tab 1: Overview & Contacts */}
       {activeTab === 'overview' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-3">
-            <h3 className="font-bold text-xs uppercase tracking-wider text-slate-500 pb-2 border-b border-slate-100 flex items-center justify-between">
-              <span>Identity & Demographics</span>
-              <Shield className="w-3.5 h-3.5 text-slate-400" />
-            </h3>
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between py-1 border-b border-slate-50">
-                <span className="text-slate-500">Gender:</span>
-                <span className="font-semibold text-slate-800">{customer.gender}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-50">
-                <span className="text-slate-500">Date of Birth:</span>
-                <span className="font-semibold text-slate-800">
-                  {customer.dateOfBirth ? customer.dateOfBirth.split('T')[0] : 'Not specified'}
-                </span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-50">
-                <span className="text-slate-500">Nationality:</span>
-                <span className="font-semibold text-slate-800">{customer.nationality}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-50">
-                <span className="text-slate-500">Registered Date:</span>
-                <span className="font-semibold text-slate-800">
-                  {formatDateTime(customer.registeredAt)}
-                </span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-50 items-center">
-                <span className="text-slate-500">DPDPA 2023 Consent:</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('compliance');
-                    loadConsents();
-                  }}
-                  className="font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 hover:underline cursor-pointer"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>
-                    {consents.length > 0
-                      ? `${consents.filter((c: any) => c.isGranted).length} Active Consents Recorded`
-                      : 'DPDPA Notice v2023.1 Recorded'}
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-3">
+              <h3 className="font-bold text-xs uppercase tracking-wider text-slate-500 pb-2 border-b border-slate-100 flex items-center justify-between">
+                <span>Identity & Demographics</span>
+                <Shield className="w-3.5 h-3.5 text-slate-400" />
+              </h3>
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between py-1 border-b border-slate-50">
+                  <span className="text-slate-500">Gender:</span>
+                  <span className="font-semibold text-slate-800">{customer.gender}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-50">
+                  <span className="text-slate-500">Date of Birth:</span>
+                  <span className="font-semibold text-slate-800">
+                    {customer.dateOfBirth ? customer.dateOfBirth.split('T')[0] : 'Not specified'}
                   </span>
-                </button>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-50">
+                  <span className="text-slate-500">Nationality:</span>
+                  <span className="font-semibold text-slate-800">{customer.nationality}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-50">
+                  <span className="text-slate-500">Registration Date:</span>
+                  <span className="font-semibold text-slate-800">
+                    {customer.registrationDate
+                      ? new Date(customer.registrationDate).toLocaleDateString('en-IN')
+                      : formatDateTime(customer.registeredAt)}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-50 items-center">
+                  <span className="text-slate-500">DPDPA 2023 Consent:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('compliance');
+                      loadConsents();
+                    }}
+                    className="font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 hover:underline cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>
+                      {consents.length > 0
+                        ? `${consents.filter((c: any) => c.isGranted).length} Active Consents Recorded`
+                        : 'DPDPA Notice v2023.1 Recorded'}
+                    </span>
+                  </button>
+                </div>
+                <div className="flex justify-between py-1 border-slate-50">
+                  <span className="text-slate-500">Assigned Branch & Staff:</span>
+                  <span className="font-semibold text-slate-800">
+                    {customer.branch?.name} ({customer.assignedStaff?.fullName || 'Unassigned'})
+                  </span>
+                </div>
               </div>
-              <div className="flex justify-between py-1 border-slate-50">
-                <span className="text-slate-500">Assigned Branch & Staff:</span>
-                <span className="font-semibold text-slate-800">
-                  {customer.branch?.name} ({customer.assignedStaff?.fullName || 'Unassigned'})
-                </span>
+            </div>
+
+            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-3">
+              <h3 className="font-bold text-xs uppercase tracking-wider text-slate-500 pb-2 border-b border-slate-100 flex items-center justify-between">
+                <span>Contact & Address</span>
+                <MapPin className="w-3.5 h-3.5 text-slate-400" />
+              </h3>
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between py-1 border-b border-slate-50">
+                  <span className="text-slate-500">Primary Mobile:</span>
+                  <span className="font-semibold text-slate-800">{customer.primaryPhone}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-50">
+                  <span className="text-slate-500">WhatsApp Number:</span>
+                  <span className="font-semibold text-slate-800">{customer.whatsappNumber || '-'}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-50">
+                  <span className="text-slate-500">Email Address:</span>
+                  <span className="font-semibold text-slate-800">{customer.email || '-'}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-50">
+                  <span className="text-slate-500">City / State:</span>
+                  <span className="font-semibold text-slate-800">
+                    {customer.city || 'Madurai'}, {customer.state || 'Tamil Nadu'}
+                  </span>
+                </div>
+                <div className="pt-1">
+                  <span className="text-slate-500 block mb-1">Residential Address:</span>
+                  <p className="text-slate-800 font-medium bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                    {customer.addressLine || 'Address not recorded.'}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-3">
+          {/* Travel Routing, Financials & Notes Ledger Card */}
+          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-4">
             <h3 className="font-bold text-xs uppercase tracking-wider text-slate-500 pb-2 border-b border-slate-100 flex items-center justify-between">
-              <span>Contact & Address</span>
-              <MapPin className="w-3.5 h-3.5 text-slate-400" />
+              <span className="flex items-center gap-1.5">
+                <Plane className="w-4 h-4 text-[#E85A18]" />
+                <span>Travel Itinerary, Financials & Service Charge (Profit)</span>
+              </span>
+              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-orange-50 text-[#E85A18] border border-orange-200">
+                Customer Amount − Agent Amount = Service Charge
+              </span>
             </h3>
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between py-1 border-b border-slate-50">
-                <span className="text-slate-500">Primary Mobile:</span>
-                <span className="font-semibold text-slate-800">{customer.primaryPhone}</span>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Travel Itinerary */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+                <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wide block">
+                  Itinerary & Route
+                </span>
+                <div className="text-xs space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Travel Date:</span>
+                    <span className="font-bold text-slate-800">
+                      {customer.travelDate ? new Date(customer.travelDate).toLocaleDateString('en-IN') : 'Not scheduled'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Departure:</span>
+                    <span className="font-bold text-slate-800">{customer.departure || '—'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Arrival:</span>
+                    <span className="font-bold text-slate-800">{customer.arrival || '—'}</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-50">
-                <span className="text-slate-500">WhatsApp Number:</span>
-                <span className="font-semibold text-slate-800">{customer.whatsappNumber || '-'}</span>
+
+              {/* Financial Breakdown */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+                <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wide block">
+                  Pricing & Agency Cost
+                </span>
+                <div className="text-xs space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Customer Amount:</span>
+                    <span className="font-mono font-bold text-slate-900">
+                      ₹{Number(customer.customerAmount || 0).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Agent Cost:</span>
+                    <span className="font-mono font-bold text-slate-700">
+                      ₹{Number(customer.agentAmount || 0).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                  <div className="flex justify-between pt-1 border-t border-slate-200">
+                    <span className="text-slate-600 font-semibold">Service Charge:</span>
+                    <span className="font-mono font-bold text-emerald-600">
+                      ₹{Number(customer.serviceCharge || 0).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-50">
-                <span className="text-slate-500">Email Address:</span>
-                <span className="font-semibold text-slate-800">{customer.email || '-'}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-50">
-                <span className="text-slate-500">City / State:</span>
-                <span className="font-semibold text-slate-800">
-                  {customer.city || 'Madurai'}, {customer.state || 'Tamil Nadu'}
+
+              {/* Profit Card */}
+              <div
+                className={`p-3.5 rounded-xl border flex flex-col justify-between ${
+                  Number(customer.serviceCharge || 0) >= 0
+                    ? 'bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-300'
+                    : 'bg-gradient-to-br from-red-50 to-rose-50 border-red-300'
+                }`}
+              >
+                <div>
+                  <span className="text-[10px] font-bold tracking-wider uppercase text-slate-600 block">
+                    Calculated Agency Profit
+                  </span>
+                  <p
+                    className={`text-2xl font-black font-mono tracking-tight mt-1 ${
+                      Number(customer.serviceCharge || 0) >= 0 ? 'text-emerald-700' : 'text-red-700'
+                    }`}
+                  >
+                    ₹{Number(customer.serviceCharge || 0).toLocaleString('en-IN')}
+                  </p>
+                </div>
+                <span
+                  className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full self-start ${
+                    Number(customer.serviceCharge || 0) >= 0
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-red-100 text-red-800'
+                  }`}
+                >
+                  {Number(customer.serviceCharge || 0) >= 0 ? 'NET PROFIT' : 'NET LOSS'}
                 </span>
               </div>
-              <div className="pt-1">
-                <span className="text-slate-500 block mb-1">Residential Address:</span>
-                <p className="text-slate-800 font-medium bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  {customer.addressLine || 'Address not recorded.'}
-                </p>
-              </div>
+            </div>
+
+            {/* Customer Details Notes */}
+            <div className="pt-2 border-t border-slate-100 space-y-1">
+              <span className="text-xs font-semibold text-slate-700 block">Customer Details Notes:</span>
+              <p className="text-xs text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-100 leading-relaxed">
+                {customer.notes || 'No customer notes recorded.'}
+              </p>
             </div>
           </div>
         </div>

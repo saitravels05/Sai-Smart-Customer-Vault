@@ -10,6 +10,10 @@ export interface ExecutiveDashboardKpisDto {
   totalStorageBytes: number;
   totalStorageFormatted: string;
   activeBranchesCount: number;
+  // Financial metrics & profit calculations (Customer Amount - Agent Amount = Service Charge)
+  totalCustomerRevenue?: number;
+  totalAgentCost?: number;
+  totalServiceCharge?: number;
 }
 
 export interface MonthlyRegistrationStat {
@@ -21,6 +25,7 @@ export interface ServiceCategoryStat {
   category: string;
   count: number;
   percentage: number;
+  totalProfit?: number;
 }
 
 export interface BranchActivityStat {
