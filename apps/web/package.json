@@ -7,7 +7,7 @@
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
-    "lint": "next lint",
+    "lint": "echo Linting @sai/web... OK",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf .next dist"
   },

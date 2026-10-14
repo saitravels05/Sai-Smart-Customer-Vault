@@ -10,16 +10,19 @@ jobs:
   validate:
     name: Build, Lint & Type-Check
     runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+      JWT_ACCESS_SECRET: "changeme_generate_min_32_char_access_secret_key_12345678"
+      JWT_REFRESH_SECRET: "changeme_generate_min_32_char_refresh_secret_key_12345678"
+      INITIAL_OWNER_PASSWORD: "OwnerSecurePass2026!"
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/sai_vault_dev?schema=public"
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 9
-          run_install: false
+        uses: pnpm/action-setup@v4
 
       - name: Setup Node.js 20+
         uses: actions/setup-node@v4
