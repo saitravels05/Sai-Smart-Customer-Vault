@@ -83,6 +83,8 @@ export default function CustomerProfilePage() {
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [showConsentModal, setShowConsentModal] = useState(false);
   const [showErasureModal, setShowErasureModal] = useState(false);
+  const [showDeleteCustomerModal, setShowDeleteCustomerModal] = useState(false);
+  const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
   const [consentToRevoke, setConsentToRevoke] = useState<any | null>(null);
   const [selectedDuplicate, setSelectedDuplicate] = useState<DuplicateCandidateDto | null>(null);
 
@@ -164,6 +166,19 @@ export default function CustomerProfilePage() {
       setStatusFeedback({ type: 'error', message: err.message || 'Operation failed' });
     } finally {
       setActionInProgress(false);
+    }
+  };
+
+  const handleConfirmDeleteCustomer = async () => {
+    if (!customer) return;
+    try {
+      setIsDeletingCustomer(true);
+      await apiClient.delete(`/customers/${customer.id}`);
+      router.push('/customers');
+    } catch (err: any) {
+      setStatusFeedback({ type: 'error', message: err.message || 'Failed to delete customer record' });
+      setIsDeletingCustomer(false);
+      setShowDeleteCustomerModal(false);
     }
   };
 
@@ -444,6 +459,15 @@ export default function CustomerProfilePage() {
                   <span>Archive</span>
                 </>
               )}
+            </button>
+            <button
+              onClick={() => setShowDeleteCustomerModal(true)}
+              disabled={actionInProgress}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-semibold transition"
+              title="Delete Customer Profile"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete</span>
             </button>
           </div>
         </div>
@@ -1518,6 +1542,67 @@ export default function CustomerProfilePage() {
             });
           }}
         />
+      )}
+
+      {/* MODAL 10: DELETE CUSTOMER RECORD */}
+      {showDeleteCustomerModal && customer && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-md w-full p-6 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2 text-rose-600">
+                <Trash2 className="w-5 h-5" />
+                <h3 className="font-bold text-sm text-slate-900">Delete Customer Record</h3>
+              </div>
+              <button
+                type="button"
+                disabled={isDeletingCustomer}
+                onClick={() => setShowDeleteCustomerModal(false)}
+                className="text-slate-400 hover:text-slate-600 disabled:opacity-50"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-rose-50 rounded-lg border border-rose-200 text-xs text-rose-900 space-y-1.5">
+              <div className="flex items-center gap-1.5 font-bold">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>Confirm Customer Deletion</span>
+              </div>
+              <p className="text-[11px] text-rose-800 leading-relaxed">
+                Are you sure you want to delete <strong className="font-semibold">{customer.fullName}</strong> ({customer.customerNumber})? This will immediately remove this customer record and all linked travel credentials, documents, and bookings.
+              </p>
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={isDeletingCustomer}
+                onClick={() => setShowDeleteCustomerModal(false)}
+                className="px-4 py-2 border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-semibold transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingCustomer}
+                onClick={handleConfirmDeleteCustomer}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+              >
+                {isDeletingCustomer ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Confirm Delete</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

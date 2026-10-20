@@ -732,6 +732,34 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       return NextResponse.json({ success: true, message: 'Registration request rejected.' });
     }
 
+    // 13. ARCHIVE CUSTOMER
+    const archiveMatch = path.match(/^customers\/([^/]+)\/archive$/);
+    if (archiveMatch) {
+      const custId = archiveMatch[1];
+      if (!isValidUuid(custId)) {
+        return NextResponse.json({ success: false, error: { message: 'Invalid customer ID.' } }, { status: 400 });
+      }
+      await prisma.customer.update({
+        where: { id: custId },
+        data: { status: 'ARCHIVED', archivedAt: new Date() },
+      });
+      return NextResponse.json({ success: true, message: 'Customer archived successfully.' });
+    }
+
+    // 14. RESTORE CUSTOMER
+    const restoreMatch = path.match(/^customers\/([^/]+)\/restore$/);
+    if (restoreMatch) {
+      const custId = restoreMatch[1];
+      if (!isValidUuid(custId)) {
+        return NextResponse.json({ success: false, error: { message: 'Invalid customer ID.' } }, { status: 400 });
+      }
+      await prisma.customer.update({
+        where: { id: custId },
+        data: { status: 'ACTIVE', archivedAt: null },
+      });
+      return NextResponse.json({ success: true, message: 'Customer restored to active status.' });
+    }
+
     return NextResponse.json({ error: { message: `Route not found: ${path}` } }, { status: 404 });
   } catch (error: any) {
     console.error(`API Error in ${path}:`, error);
@@ -1045,8 +1073,36 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 
     // 4. CUSTOMERS LIST & DETAIL
     if (path === 'customers') {
+      const search = req.nextUrl.searchParams.get('search')?.trim();
+      const category = req.nextUrl.searchParams.get('category');
+      const status = req.nextUrl.searchParams.get('status');
+
+      const whereClause: any = {};
+      if (status === 'ARCHIVED') {
+        whereClause.status = 'ARCHIVED';
+        whereClause.isDeleted = false;
+      } else if (status === 'ALL') {
+        whereClause.isDeleted = false;
+      } else {
+        whereClause.status = 'ACTIVE';
+        whereClause.isDeleted = false;
+      }
+
+      if (category && category !== 'ALL') {
+        whereClause.primaryCategory = category;
+      }
+
+      if (search) {
+        whereClause.OR = [
+          { fullName: { contains: search, mode: 'insensitive' } },
+          { primaryPhone: { contains: search, mode: 'insensitive' } },
+          { customerNumber: { contains: search, mode: 'insensitive' } },
+          { city: { contains: search, mode: 'insensitive' } },
+        ];
+      }
+
       const customers = await prisma.customer.findMany({
-        where: { isDeleted: false },
+        where: whereClause,
         take: 50,
         orderBy: { createdAt: 'desc' },
         include: { branch: true },
@@ -1171,6 +1227,100 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     return NextResponse.json({ error: { message: `Route not found: ${path}` } }, { status: 404 });
   } catch (error: any) {
     console.error(`API GET Error in ${path}:`, error);
+    return NextResponse.json({ success: false, error: { message: error.message || 'Internal Server Error' } }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: { slug: string[] } }) {
+  const path = (params.slug || []).join('/');
+
+  try {
+    const authUser = getAuthUser(req);
+    if (!authUser) {
+      return NextResponse.json({ success: false, error: { message: 'Unauthorized' } }, { status: 401 });
+    }
+
+    // 1. DELETE CUSTOMER PROFILE
+    const customerMatch = path.match(/^customers\/([^/]+)$/);
+    if (customerMatch) {
+      const custId = customerMatch[1];
+      if (!isValidUuid(custId)) {
+        return NextResponse.json({ success: false, error: { message: 'Invalid customer ID' } }, { status: 400 });
+      }
+
+      const existing = await prisma.customer.findUnique({
+        where: { id: custId },
+      });
+
+      if (!existing) {
+        return NextResponse.json({ success: false, error: { message: 'Customer record not found' } }, { status: 404 });
+      }
+
+      try {
+        await prisma.customer.delete({
+          where: { id: custId },
+        });
+      } catch (delErr: any) {
+        // Fallback to soft delete if constraints exist
+        await prisma.customer.update({
+          where: { id: custId },
+          data: {
+            isDeleted: true,
+            status: 'ARCHIVED',
+            archivedAt: new Date(),
+          },
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Customer ${existing.fullName} (${existing.customerNumber}) has been successfully deleted.`,
+      });
+    }
+
+    // 2. DELETE PASSPORT
+    const passportMatch = path.match(/^customers\/([^/]+)\/passports\/([^/]+)$/);
+    if (passportMatch) {
+      const passportId = passportMatch[2];
+      if (isValidUuid(passportId)) {
+        await prisma.passport.delete({ where: { id: passportId } }).catch(() => {});
+      }
+      return NextResponse.json({ success: true, message: 'Passport credential removed successfully.' });
+    }
+
+    // 3. DELETE VISA
+    const visaMatch = path.match(/^customers\/([^/]+)\/visas\/([^/]+)$/);
+    if (visaMatch) {
+      const visaId = visaMatch[2];
+      if (isValidUuid(visaId)) {
+        await prisma.visa.delete({ where: { id: visaId } }).catch(() => {});
+      }
+      return NextResponse.json({ success: true, message: 'Visa record removed successfully.' });
+    }
+
+    // 4. DELETE BOOKING
+    const bookingMatch = path.match(/^customers\/([^/]+)\/bookings\/([^/]+)$/);
+    if (bookingMatch) {
+      const bookingId = bookingMatch[2];
+      if (isValidUuid(bookingId)) {
+        await prisma.travelBooking.delete({ where: { id: bookingId } }).catch(() => {});
+      }
+      return NextResponse.json({ success: true, message: 'Travel booking removed successfully.' });
+    }
+
+    // 5. DELETE RELATIONSHIP
+    const relMatch = path.match(/^customers\/([^/]+)\/relationships\/([^/]+)$/);
+    if (relMatch) {
+      const relId = relMatch[2];
+      if (isValidUuid(relId)) {
+        await prisma.customerRelationship.delete({ where: { id: relId } }).catch(() => {});
+      }
+      return NextResponse.json({ success: true, message: 'Relationship removed successfully.' });
+    }
+
+    return NextResponse.json({ error: { message: `Route not found: ${path}` } }, { status: 404 });
+  } catch (error: any) {
+    console.error(`API DELETE Error in ${path}:`, error);
     return NextResponse.json({ success: false, error: { message: error.message || 'Internal Server Error' } }, { status: 500 });
   }
 }

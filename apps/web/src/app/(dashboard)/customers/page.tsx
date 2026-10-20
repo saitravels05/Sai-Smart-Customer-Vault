@@ -15,9 +15,12 @@ import {
   ArrowRight,
   FolderLock,
   Clock,
-  Sparkles,
   AlertCircle,
   Loader2,
+  Trash2,
+  AlertTriangle,
+  X,
+  CheckCircle2,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { ServiceCategory, CustomerStatus } from '@sai/shared-types';
@@ -30,6 +33,9 @@ export default function CustomersDirectoryPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ACTIVE');
+  const [customerToDelete, setCustomerToDelete] = useState<any | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [actionFeedback, setActionFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
     fetchCustomers();
@@ -54,6 +60,29 @@ export default function CustomersDirectoryPage() {
       setCustomers([]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!customerToDelete) return;
+    try {
+      setIsDeleting(true);
+      const res: any = await apiClient.delete(`/customers/${customerToDelete.id}`);
+      setActionFeedback({
+        type: 'success',
+        message:
+          res?.message ||
+          `Customer ${customerToDelete.fullName} (${customerToDelete.customerNumber}) has been deleted successfully.`,
+      });
+      setCustomerToDelete(null);
+      await fetchCustomers();
+    } catch (err: any) {
+      setActionFeedback({
+        type: 'error',
+        message: err.message || 'Failed to delete customer record. Please try again.',
+      });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -91,6 +120,33 @@ export default function CustomersDirectoryPage() {
           <span>Register New Customer</span>
         </Link>
       </div>
+
+      {/* Action Feedback Banner */}
+      {actionFeedback && (
+        <div
+          className={`p-3.5 rounded-xl border text-xs flex items-center justify-between gap-3 shadow-2xs animate-in fade-in duration-200 ${
+            actionFeedback.type === 'success'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              : 'bg-rose-50 border-rose-200 text-rose-800'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {actionFeedback.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            )}
+            <span className="font-semibold">{actionFeedback.message}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActionFeedback(null)}
+            className="text-slate-400 hover:text-slate-600 p-1"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Filter and Search Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3">
@@ -251,13 +307,25 @@ export default function CustomersDirectoryPage() {
                       </span>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <Link
-                        href={`/customers/${c.id}`}
-                        className="inline-flex items-center gap-1 text-xs font-bold text-[#E85A18] hover:text-[#D44E0F] hover:underline"
-                      >
-                        <span>View Profile</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </Link>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Link
+                          href={`/customers/${c.id}`}
+                          className="inline-flex items-center gap-1 text-xs font-bold text-[#E85A18] hover:text-[#D44E0F] hover:bg-orange-50 px-2.5 py-1.5 rounded-lg transition"
+                          title="View Customer Profile"
+                        >
+                          <span>View</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => setCustomerToDelete(c)}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 py-1.5 rounded-lg border border-transparent hover:border-rose-200 transition"
+                          title="Delete Customer Profile"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -266,6 +334,97 @@ export default function CustomersDirectoryPage() {
           </div>
         )}
       </div>
+
+      {/* Delete Customer Confirmation Modal */}
+      {customerToDelete && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-md w-full p-6 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2 text-rose-600">
+                <Trash2 className="w-5 h-5" />
+                <h3 className="font-bold text-sm text-slate-900">Delete Customer Record</h3>
+              </div>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setCustomerToDelete(null)}
+                className="text-slate-400 hover:text-slate-600 disabled:opacity-50"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-rose-50 rounded-lg border border-rose-200 text-xs text-rose-900 space-y-1.5">
+              <div className="flex items-center gap-1.5 font-bold">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>Confirm Customer Record Deletion</span>
+              </div>
+              <p className="text-[11px] text-rose-800 leading-relaxed">
+                Are you sure you want to delete this customer? This will immediately remove their profile, travel itineraries, booking records, and credentials from the active customer directory.
+              </p>
+            </div>
+
+            {/* Customer Details Summary */}
+            <div className="bg-slate-50 rounded-lg border border-slate-200 p-3 space-y-2 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 text-[11px]">Customer ID:</span>
+                <span className="font-mono font-bold text-[#E85A18]">{customerToDelete.customerNumber}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 text-[11px]">Full Name:</span>
+                <span className="font-bold text-slate-900">{customerToDelete.fullName}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 text-[11px]">Contact Number:</span>
+                <span className="font-medium text-slate-800">{customerToDelete.primaryPhone}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 text-[11px]">Service Category:</span>
+                <span className="font-semibold text-slate-700">{customerToDelete.primaryCategory?.replace(/_/g, ' ')}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 text-[11px]">Branch:</span>
+                <span className="font-medium text-slate-800">{customerToDelete.branchName || 'Madurai Head Office'}</span>
+              </div>
+              {Number(customerToDelete.serviceCharge) > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 text-[11px]">Service Charge Profit:</span>
+                  <span className="font-mono font-bold text-emerald-600">₹{Number(customerToDelete.serviceCharge).toLocaleString('en-IN')}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setCustomerToDelete(null)}
+                className="px-4 py-2 border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-semibold transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Confirm Delete</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
