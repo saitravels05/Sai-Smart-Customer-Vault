@@ -1445,7 +1445,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     }
 
     // 24. DOCUMENT UPLOAD (Single)
-    if (path === 'documents/upload') {
+    if (path === 'documents/upload' || path === 'documents') {
       let file: File | null = null;
       let customerId = '';
       let rawCategory = 'IDENTITY_DOCUMENT';
