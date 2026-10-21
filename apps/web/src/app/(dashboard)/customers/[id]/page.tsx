@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   Users,
@@ -67,9 +67,23 @@ export default function CustomerProfilePage() {
   const [duplicates, setDuplicates] = useState<DuplicateCandidateDto[]>([]);
   const [consents, setConsents] = useState<any[]>([]);
   const [loadingConsents, setLoadingConsents] = useState(false);
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get('tab');
   const [activeTab, setActiveTab] = useState<
     'overview' | 'credentials' | 'documents' | 'bookings' | 'notes' | 'family' | 'timeline' | 'compliance'
-  >('overview');
+  >((initialTab as any) || 'overview');
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (
+      tabParam &&
+      ['overview', 'credentials', 'documents', 'bookings', 'notes', 'family', 'timeline', 'compliance'].includes(
+        tabParam,
+      )
+    ) {
+      setActiveTab(tabParam as any);
+    }
+  }, [searchParams]);
   const [isLoading, setIsLoading] = useState(true);
   const [actionInProgress, setActionInProgress] = useState(false);
   const [statusFeedback, setStatusFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);

@@ -49,7 +49,7 @@ export function AiVerificationModal({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [mimeType, setMimeType] = useState<string>('application/pdf');
 
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
   const loadData = async () => {
     setIsLoading(true);

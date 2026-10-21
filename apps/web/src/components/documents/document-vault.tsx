@@ -101,7 +101,7 @@ export function DocumentVault({
   const [aiModalDoc, setAiModalDoc] = useState<any | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
   const loadDocuments = async () => {
     setIsLoading(true);
@@ -252,10 +252,20 @@ export function DocumentVault({
         },
       );
 
-      const url = window.URL.createObjectURL(new Blob([res.data]));
+      let filename = `${docTitle}${withWatermark ? '_WATERMARKED' : ''}.pdf`;
+      const disposition = res.headers ? (res.headers['content-disposition'] || (res.headers as any).get?.('content-disposition')) : null;
+      if (disposition && disposition.includes('filename=')) {
+        const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (match && match[1]) {
+          filename = decodeURIComponent(match[1].replace(/['"]/g, ''));
+        }
+      }
+
+      const contentType = (res.headers ? (res.headers['content-type'] || (res.headers as any).get?.('content-type')) : null) || 'application/octet-stream';
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: contentType }));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `${docTitle}${withWatermark ? '_WATERMARKED' : ''}.pdf`);
+      link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
       link.remove();

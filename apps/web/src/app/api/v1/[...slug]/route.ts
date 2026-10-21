@@ -225,6 +225,88 @@ startxref
   return Buffer.from(pdfString);
 }
 
+interface StoredDocumentPayload {
+  desc?: string;
+  fileName?: string;
+  fileBase64?: string;
+}
+
+function packDocumentDescription(desc: string | undefined, fileName: string, fileBuffer: Buffer): string {
+  const payload: StoredDocumentPayload = {
+    desc: desc?.trim() || '',
+    fileName,
+    fileBase64: fileBuffer.toString('base64'),
+  };
+  return JSON.stringify(payload);
+}
+
+function cleanDocumentDescription(desc: string | null | undefined): string | null {
+  if (!desc) return null;
+  if (desc.startsWith('{') && desc.includes('"fileBase64"')) {
+    try {
+      const parsed = JSON.parse(desc);
+      return parsed.desc || null;
+    } catch {
+      return desc;
+    }
+  }
+  return desc;
+}
+
+function extractDocumentFile(doc: {
+  id: string;
+  title: string;
+  type: string;
+  mimeType: string;
+  sha256Checksum: string;
+  storageKey: string;
+  description: string | null;
+  customer?: { fullName: string } | null;
+}): { buffer: Buffer; fileName: string; mimeType: string } {
+  let buffer: Buffer | null = null;
+  let originalFileName: string | null = null;
+
+  if (doc.description) {
+    try {
+      if (doc.description.startsWith('{') && doc.description.includes('"fileBase64"')) {
+        const parsed = JSON.parse(doc.description);
+        if (parsed.fileBase64) {
+          buffer = Buffer.from(parsed.fileBase64, 'base64');
+          if (parsed.fileName) {
+            originalFileName = parsed.fileName;
+          }
+        }
+      }
+    } catch {}
+  }
+
+  if (!buffer) {
+    try {
+      const storageDir = getVaultStorageDir();
+      const fullPath = nodePath.join(storageDir, doc.storageKey);
+      if (fs.existsSync(fullPath)) {
+        buffer = fs.readFileSync(fullPath);
+      }
+    } catch {}
+  }
+
+  if (!buffer) {
+    buffer = generateFallbackPdf(doc.title, doc.customer?.fullName || 'Customer', doc.type, doc.sha256Checksum);
+  }
+
+  const ext = originalFileName
+    ? nodePath.extname(originalFileName)
+    : (nodePath.extname(doc.storageKey) || (doc.mimeType === 'image/jpeg' ? '.jpg' : doc.mimeType === 'image/png' ? '.png' : '.pdf'));
+
+  const finalFileName = originalFileName || `${(doc.title || 'document').replace(/[^a-zA-Z0-9_-]/g, '_')}${ext}`;
+
+  return {
+    buffer,
+    fileName: finalFileName,
+    mimeType: doc.mimeType || 'application/pdf',
+  };
+}
+
 // CRC-32 for standard ZIP creation
 const CRC_TABLE = new Uint32Array(256);
 for (let i = 0; i < 256; i++) {
@@ -1401,7 +1483,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
           category: category as any,
           type: docType as any,
           title: finalTitle,
-          description: description.trim() || null,
+          description: packDocumentDescription(description, fileName, fileBuffer),
           tags,
           storageKey,
           bucketName: 'sai-vault-secure-docs',
@@ -1455,6 +1537,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         message: 'Document successfully secured in vault.',
         data: {
           ...doc,
+          description: cleanDocumentDescription(doc.description),
           fileSizeBytes: Number(doc.fileSizeBytes),
         },
       });
@@ -1521,6 +1604,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
             category: category as any,
             type: docType as any,
             title: file.name.replace(/\.[^/.]+$/, ''),
+            description: packDocumentDescription('', file.name, fileBuffer),
             storageKey,
             bucketName: 'sai-vault-secure-docs',
             fileSizeBytes,
@@ -1549,6 +1633,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
         results.push({
           ...doc,
+          description: cleanDocumentDescription(doc.description),
           fileSizeBytes: Number(doc.fileSizeBytes),
         });
       }
@@ -1579,22 +1664,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       const storageDir = getVaultStorageDir();
 
       for (const doc of docs) {
-        let buf: Buffer | null = null;
-        try {
-          const fullPath = nodePath.join(storageDir, doc.storageKey);
-          if (fs.existsSync(fullPath)) {
-            buf = await fs.promises.readFile(fullPath);
-          }
-        } catch {}
-
-        if (!buf) {
-          buf = generateFallbackPdf(doc.title, doc.customer?.fullName || 'Customer', doc.type, doc.sha256Checksum);
-        }
-
-        const ext = nodePath.extname(doc.storageKey) || (doc.mimeType === 'image/jpeg' ? '.jpg' : doc.mimeType === 'image/png' ? '.png' : '.pdf');
+        const { buffer, fileName } = extractDocumentFile(doc);
         const cleanTitle = (doc.title || 'doc').replace(/[^a-zA-Z0-9_-]/g, '_');
-        const zipEntryName = `${doc.type}_${cleanTitle}_${doc.id.slice(0, 6)}${ext}`;
-        filesToZip.push({ name: zipEntryName, buffer: buf });
+        const zipEntryName = `${doc.type}_${cleanTitle}_${doc.id.slice(0, 6)}_${fileName}`;
+        filesToZip.push({ name: zipEntryName, buffer });
       }
 
       const zipBuffer = createZipBuffer(filesToZip);
@@ -2041,6 +2114,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
           branchCode: customer.branch?.code || 'IXM-HO',
           documents: (customer.documents || []).map((d) => ({
             ...d,
+            description: cleanDocumentDescription(d.description),
             fileSizeBytes: Number(d.fileSizeBytes),
           })),
         },
@@ -2224,6 +2298,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
         data: {
           items: items.map((doc) => ({
             ...doc,
+            description: cleanDocumentDescription(doc.description),
             fileSizeBytes: Number(doc.fileSizeBytes),
           })),
           total,
@@ -2251,19 +2326,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
         return NextResponse.json({ success: false, error: { message: 'Document not found.' } }, { status: 404 });
       }
 
-      const storageDir = getVaultStorageDir();
-      const fullPath = nodePath.join(storageDir, doc.storageKey);
-
-      let buffer: Buffer | null = null;
-      try {
-        if (fs.existsSync(fullPath)) {
-          buffer = await fs.promises.readFile(fullPath);
-        }
-      } catch {}
-
-      if (!buffer) {
-        buffer = generateFallbackPdf(doc.title, doc.customer?.fullName || 'Customer', doc.type, doc.sha256Checksum);
-      }
+      const { buffer, fileName, mimeType } = extractDocumentFile(doc);
 
       // Log access in background
       const authUser = getAuthUser(req);
@@ -2279,13 +2342,12 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
         }).catch(() => {});
       }
 
-      const fileName = nodePath.basename(doc.storageKey);
       return new NextResponse(new Uint8Array(buffer), {
         status: 200,
         headers: {
-          'Content-Type': doc.mimeType || 'application/pdf',
+          'Content-Type': mimeType,
           'Content-Length': buffer.length.toString(),
-          'Content-Disposition': `inline; filename="${encodeURIComponent(fileName)}"`,
+          'Content-Disposition': `attachment; filename="${encodeURIComponent(fileName)}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
         },
       });
     }
@@ -2355,6 +2417,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
         success: true,
         data: {
           ...doc,
+          description: cleanDocumentDescription(doc.description),
           fileSizeBytes: Number(doc.fileSizeBytes),
           versions: doc.versions.map((v) => ({
             ...v,

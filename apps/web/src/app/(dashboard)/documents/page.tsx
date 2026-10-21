@@ -33,7 +33,7 @@ export default function GlobalDocumentsExplorerPage() {
   const [selectedType, setSelectedType] = useState<string>('ALL');
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
 
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
   const loadDocuments = async () => {
     setIsLoading(true);
@@ -87,10 +87,20 @@ export default function GlobalDocumentsExplorerPage() {
         responseType: 'blob',
       });
 
-      const url = window.URL.createObjectURL(new Blob([res.data]));
+      let filename = `${title}_WATERMARKED.pdf`;
+      const disposition = res.headers ? (res.headers['content-disposition'] || (res.headers as any).get?.('content-disposition')) : null;
+      if (disposition && disposition.includes('filename=')) {
+        const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (match && match[1]) {
+          filename = decodeURIComponent(match[1].replace(/['"]/g, ''));
+        }
+      }
+
+      const contentType = (res.headers ? (res.headers['content-type'] || (res.headers as any).get?.('content-type')) : null) || 'application/octet-stream';
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: contentType }));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `${title}_WATERMARKED.pdf`);
+      link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -305,7 +315,7 @@ export default function GlobalDocumentsExplorerPage() {
                               <ExternalLink className="w-3 h-3 text-slate-400" />
                             </Link>
                             <p className="text-[10px] text-slate-500 font-mono">
-                              {doc.customer.customerNumber} • {doc.customer.mobileNumber}
+                              {doc.customer.customerNumber} • {doc.customer.primaryPhone || doc.customer.mobileNumber || ''}
                             </p>
                           </div>
                         ) : (
@@ -333,7 +343,7 @@ export default function GlobalDocumentsExplorerPage() {
                       </td>
                       <td className="py-3 px-4 text-right space-x-2">
                         <Link
-                          href={`/customers/${doc.customerId}`}
+                          href={`/customers/${doc.customerId}?tab=documents`}
                           className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold inline-flex items-center gap-1 text-[11px]"
                         >
                           <Eye className="w-3 h-3" /> View Vault
@@ -341,9 +351,9 @@ export default function GlobalDocumentsExplorerPage() {
                         <button
                           onClick={() => downloadDoc(doc.id, doc.title)}
                           className="px-2.5 py-1 rounded bg-orange-100 hover:bg-orange-200 text-[#E85A18] font-bold inline-flex items-center gap-1 text-[11px]"
-                          title="Download with Official Confidential Watermark"
+                          title="Download Document"
                         >
-                          <Download className="w-3 h-3" /> Watermark
+                          <Download className="w-3 h-3" /> Download
                         </button>
                       </td>
                     </tr>
