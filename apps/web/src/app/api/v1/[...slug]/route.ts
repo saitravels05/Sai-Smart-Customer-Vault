@@ -75,6 +75,35 @@ function isValidUuid(id: string | null | undefined): boolean {
   return typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 }
 
+function getFieldEncryptionKey(): Buffer {
+  const secret = process.env.FIELD_ENCRYPTION_KEY || 'sai_vault_field_enc_key_32bytes_2026';
+  return crypto.createHash('sha256').update(secret).digest();
+}
+
+function encryptPiiField(plainText: string): string {
+  if (!plainText) return plainText;
+  const key = getFieldEncryptionKey();
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const encrypted = Buffer.concat([cipher.update(plainText, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return Buffer.concat([iv, tag, encrypted]).toString('hex');
+}
+
+function hashPiiField(plainText: string): string {
+  if (!plainText) return '';
+  return crypto.createHash('sha256').update(plainText.trim().toUpperCase()).digest('hex');
+}
+
+function maskPiiIdentifier(identifier: string): string {
+  if (!identifier) return '';
+  const clean = identifier.trim();
+  if (clean.length <= 4) return '***' + clean.slice(-1);
+  const prefix = clean.slice(0, 2);
+  const suffix = clean.slice(-2);
+  return `${prefix}***${suffix}`;
+}
+
 // Resend Email Helper
 async function sendResendOtpEmail(toEmail: string, otpCode: string): Promise<boolean> {
   const apiKey = process.env.EMAIL_API_KEY || '';
@@ -760,6 +789,324 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       return NextResponse.json({ success: true, message: 'Customer restored to active status.' });
     }
 
+    // 15. ADD PASSPORT CREDENTIAL
+    const passportAddMatch = path.match(/^customers\/([^/]+)\/passports$/);
+    if (passportAddMatch) {
+      const custId = passportAddMatch[1];
+      if (!isValidUuid(custId)) {
+        return NextResponse.json({ success: false, error: { message: 'Invalid customer ID' } }, { status: 400 });
+      }
+
+      const body = await req.json();
+      const cleanNumber = (body.passportNumber || '').trim().toUpperCase();
+      if (!cleanNumber || cleanNumber.length < 5) {
+        return NextResponse.json(
+          { success: false, error: { message: 'Please enter a valid passport number (at least 5 characters).' } },
+          { status: 400 },
+        );
+      }
+      if (!body.expiryDate) {
+        return NextResponse.json(
+          { success: false, error: { message: 'Passport expiry date is required.' } },
+          { status: 400 },
+        );
+      }
+
+      const customer = await prisma.customer.findUnique({ where: { id: custId } });
+      if (!customer) {
+        return NextResponse.json({ success: false, error: { message: 'Customer record not found.' } }, { status: 404 });
+      }
+
+      const passportEnc = encryptPiiField(cleanNumber);
+      const passportMask = maskPiiIdentifier(cleanNumber);
+      const passportHash = hashPiiField(cleanNumber);
+      const expiry = new Date(body.expiryDate);
+      const issue = body.issueDate ? new Date(body.issueDate) : null;
+
+      const existing = await prisma.passport.findUnique({ where: { passportHash } });
+      if (existing) {
+        if (existing.customerId === custId) {
+          const updated = await prisma.passport.update({
+            where: { id: existing.id },
+            data: {
+              passportNumberEnc: passportEnc,
+              passportNumberMask: passportMask,
+              issuingCountry: body.issuingCountry || 'IND',
+              issueDate: issue,
+              expiryDate: expiry,
+              placeOfIssue: body.placeOfIssue || 'Madurai',
+              isCurrent: true,
+            },
+          });
+          return NextResponse.json({ success: true, message: 'Passport updated successfully.', data: updated });
+        } else {
+          return NextResponse.json(
+            { success: false, error: { message: 'This passport number is already registered under another customer profile.' } },
+            { status: 409 },
+          );
+        }
+      }
+
+      const passport = await prisma.passport.create({
+        data: {
+          customerId: custId,
+          passportNumberEnc: passportEnc,
+          passportNumberMask: passportMask,
+          passportHash,
+          issuingCountry: body.issuingCountry || 'IND',
+          issueDate: issue,
+          expiryDate: expiry,
+          placeOfIssue: body.placeOfIssue || 'Madurai',
+          isCurrent: true,
+        },
+      });
+
+      return NextResponse.json({ success: true, message: 'Passport added successfully.', data: passport });
+    }
+
+    // 16. ADD VISA RECORD
+    const visaAddMatch = path.match(/^customers\/([^/]+)\/visas$/);
+    if (visaAddMatch) {
+      const custId = visaAddMatch[1];
+      if (!isValidUuid(custId)) {
+        return NextResponse.json({ success: false, error: { message: 'Invalid customer ID' } }, { status: 400 });
+      }
+
+      const body = await req.json();
+      if (!body.country || !body.expiryDate) {
+        return NextResponse.json(
+          { success: false, error: { message: 'Destination country and visa expiry date are required.' } },
+          { status: 400 },
+        );
+      }
+
+      const customer = await prisma.customer.findUnique({ where: { id: custId } });
+      if (!customer) {
+        return NextResponse.json({ success: false, error: { message: 'Customer record not found.' } }, { status: 404 });
+      }
+
+      const visaEnc = body.visaNumber ? encryptPiiField(body.visaNumber.trim().toUpperCase()) : null;
+      const expiry = new Date(body.expiryDate);
+      const issue = body.issueDate ? new Date(body.issueDate) : null;
+
+      const visa = await prisma.visa.create({
+        data: {
+          customerId: custId,
+          country: body.country,
+          visaCategory: body.visaCategory || 'TOURIST',
+          visaNumberEnc: visaEnc,
+          issueDate: issue,
+          expiryDate: expiry,
+          durationOfStayDays: body.durationOfStayDays ? Number(body.durationOfStayDays) : null,
+          entriesPermitted: body.entriesPermitted || 'SINGLE',
+          status: 'ACTIVE',
+        },
+      });
+
+      return NextResponse.json({ success: true, message: 'Visa credential added successfully.', data: visa });
+    }
+
+    // 17. ADD TRAVEL BOOKING
+    const bookingAddMatch = path.match(/^customers\/([^/]+)\/bookings$/);
+    if (bookingAddMatch) {
+      const custId = bookingAddMatch[1];
+      if (!isValidUuid(custId)) {
+        return NextResponse.json({ success: false, error: { message: 'Invalid customer ID' } }, { status: 400 });
+      }
+
+      const body = await req.json();
+      const customer = await prisma.customer.findUnique({ where: { id: custId } });
+      if (!customer) {
+        return NextResponse.json({ success: false, error: { message: 'Customer record not found.' } }, { status: 404 });
+      }
+
+      const bookingRef = body.bookingRef || `BKG-${Date.now().toString(36).toUpperCase()}`;
+
+      const booking = await prisma.travelBooking.create({
+        data: {
+          customerId: custId,
+          bookingRef,
+          pnr: body.pnr ? body.pnr.trim().toUpperCase() : null,
+          airline: body.airline || null,
+          flightNumber: body.flightNumber || null,
+          originAirport: body.originAirport || null,
+          destAirport: body.destAirport || null,
+          departureTime: body.departureTime ? new Date(body.departureTime) : null,
+          arrivalTime: body.arrivalTime ? new Date(body.arrivalTime) : null,
+          hotelName: body.hotelName || null,
+          checkInDate: body.checkInDate ? new Date(body.checkInDate) : null,
+          checkOutDate: body.checkOutDate ? new Date(body.checkOutDate) : null,
+        },
+      });
+
+      return NextResponse.json({ success: true, message: 'Travel booking added successfully.', data: booking });
+    }
+
+    // 18. ADD CUSTOMER STAFF NOTE
+    const noteAddMatch = path.match(/^customers\/([^/]+)\/notes$/);
+    if (noteAddMatch) {
+      const custId = noteAddMatch[1];
+      if (!isValidUuid(custId)) {
+        return NextResponse.json({ success: false, error: { message: 'Invalid customer ID' } }, { status: 400 });
+      }
+
+      const body = await req.json();
+      const content = (body.content || '').trim();
+      if (!content) {
+        return NextResponse.json({ success: false, error: { message: 'Note content cannot be empty.' } }, { status: 400 });
+      }
+
+      const cust = await prisma.customer.findUnique({ where: { id: custId } });
+      if (!cust) {
+        return NextResponse.json({ success: false, error: { message: 'Customer record not found.' } }, { status: 404 });
+      }
+
+      const user = getAuthUser(req);
+      const authorTag = user?.fullName || user?.email || 'Staff Member';
+      const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 16);
+      const category = body.category || 'GENERAL';
+      const newNoteLine = `[${timestamp} | ${authorTag} (${category})]: ${content}`;
+
+      const updatedNotes = cust.notes ? `${cust.notes}\n\n${newNoteLine}` : newNoteLine;
+
+      await prisma.customer.update({
+        where: { id: custId },
+        data: { notes: updatedNotes },
+      });
+
+      return NextResponse.json({ success: true, message: 'Staff note recorded successfully.' });
+    }
+
+    // 19. ADD CUSTOMER RELATIONSHIP
+    const relAddMatch = path.match(/^customers\/([^/]+)\/relationships$/);
+    if (relAddMatch) {
+      const custId = relAddMatch[1];
+      if (!isValidUuid(custId)) {
+        return NextResponse.json({ success: false, error: { message: 'Invalid customer ID' } }, { status: 400 });
+      }
+
+      const body = await req.json();
+      if (!isValidUuid(body.relativeId)) {
+        return NextResponse.json({ success: false, error: { message: 'Please select a valid relative customer.' } }, { status: 400 });
+      }
+
+      const rel = await prisma.customerRelationship.create({
+        data: {
+          customerId: custId,
+          relativeId: body.relativeId,
+          relationship: body.relationship || 'FAMILY',
+          groupName: body.groupName || null,
+        },
+      });
+
+      return NextResponse.json({ success: true, message: 'Relationship linked successfully.', data: rel });
+    }
+
+    // 20. MERGE CUSTOMER PROFILES
+    const mergeMatch = path.match(/^customers\/([^/]+)\/merge$/);
+    if (mergeMatch) {
+      const targetCustomerId = mergeMatch[1];
+      const body = await req.json();
+      const duplicateCustomerId = body.duplicateCustomerId;
+
+      if (!isValidUuid(targetCustomerId) || !isValidUuid(duplicateCustomerId)) {
+        return NextResponse.json({ success: false, error: { message: 'Invalid customer IDs for merge.' } }, { status: 400 });
+      }
+
+      await prisma.$transaction([
+        prisma.passport.updateMany({
+          where: { customerId: duplicateCustomerId },
+          data: { customerId: targetCustomerId },
+        }),
+        prisma.visa.updateMany({
+          where: { customerId: duplicateCustomerId },
+          data: { customerId: targetCustomerId },
+        }),
+        prisma.travelBooking.updateMany({
+          where: { customerId: duplicateCustomerId },
+          data: { customerId: targetCustomerId },
+        }),
+        prisma.document.updateMany({
+          where: { customerId: duplicateCustomerId },
+          data: { customerId: targetCustomerId },
+        }),
+        prisma.customer.update({
+          where: { id: duplicateCustomerId },
+          data: {
+            isDeleted: true,
+            status: 'ARCHIVED',
+            archivedAt: new Date(),
+            notes: `[MERGED INTO ${targetCustomerId}]: ${body.resolutionReason || 'Profile merge'}`,
+          },
+        }),
+      ]);
+
+      return NextResponse.json({ success: true, message: 'Customer profiles merged successfully.' });
+    }
+
+    // 21. RECORD DPDPA CONSENT
+    const consentAddMatch = path.match(/^compliance\/customers\/([^/]+)\/consents$/);
+    if (consentAddMatch) {
+      const custId = consentAddMatch[1];
+      if (!isValidUuid(custId)) {
+        return NextResponse.json({ success: false, error: { message: 'Invalid customer ID' } }, { status: 400 });
+      }
+
+      const body = await req.json();
+      const authUser = getAuthUser(req);
+
+      const consent = await prisma.customerConsent.create({
+        data: {
+          customerId: custId,
+          purpose: body.purpose || 'TRAVEL_BOOKING_FULFILLMENT',
+          isGranted: true,
+          noticeVersion: body.noticeVersion || 'v2023.1',
+          recordedById: authUser?.sub || '00000000-0000-0000-0000-000000000000',
+        },
+      });
+
+      return NextResponse.json({ success: true, message: 'Consent recorded successfully.', data: consent });
+    }
+
+    // 22. REVOKE DPDPA CONSENT
+    const consentRevokeMatch = path.match(/^compliance\/customers\/([^/]+)\/consents\/([^/]+)\/revoke$/);
+    if (consentRevokeMatch) {
+      const consentId = consentRevokeMatch[2];
+      if (isValidUuid(consentId)) {
+        await prisma.customerConsent.update({
+          where: { id: consentId },
+          data: { isGranted: false, revokedAt: new Date() },
+        });
+      }
+      return NextResponse.json({ success: true, message: 'Consent revoked successfully.' });
+    }
+
+    // 23. DPDPA STATUTORY ANONYMIZATION
+    const anonymizeMatch = path.match(/^compliance\/customers\/([^/]+)\/anonymize$/);
+    if (anonymizeMatch) {
+      const custId = anonymizeMatch[1];
+      if (!isValidUuid(custId)) {
+        return NextResponse.json({ success: false, error: { message: 'Invalid customer ID' } }, { status: 400 });
+      }
+
+      await prisma.customer.update({
+        where: { id: custId },
+        data: {
+          fullName: '[DPDPA ANONYMIZED]',
+          primaryPhone: '0000000000',
+          whatsappNumber: null,
+          email: null,
+          addressLine: null,
+          city: 'ANONYMIZED',
+          notes: '[CUSTOMER_DPDPA_ANONYMIZED]',
+          status: 'ARCHIVED',
+          archivedAt: new Date(),
+        },
+      });
+
+      return NextResponse.json({ success: true, message: 'Customer PII anonymized pursuant to DPDPA 2023 Section 12.' });
+    }
+
     return NextResponse.json({ error: { message: `Route not found: ${path}` } }, { status: 404 });
   } catch (error: any) {
     console.error(`API Error in ${path}:`, error);
@@ -1125,10 +1472,12 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
         where: { id: custId, isDeleted: false },
         include: {
           branch: true,
-          passports: true,
-          visas: true,
-          documents: true,
-          bookings: true,
+          passports: { orderBy: { createdAt: 'desc' } },
+          visas: { orderBy: { createdAt: 'desc' } },
+          documents: { orderBy: { createdAt: 'desc' } },
+          bookings: { orderBy: { createdAt: 'desc' } },
+          consents: { orderBy: { recordedAt: 'desc' } },
+          relationshipsFrom: { include: { relative: true } },
         },
       });
       if (!customer) {
@@ -1149,7 +1498,36 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 
     const duplicatesMatch = path.match(/^customers\/([^/]+)\/duplicates$/);
     if (duplicatesMatch) {
-      return NextResponse.json({ success: true, data: [] });
+      const custId = duplicatesMatch[1];
+      if (!isValidUuid(custId)) {
+        return NextResponse.json({ success: true, data: [] });
+      }
+      const target = await prisma.customer.findUnique({ where: { id: custId } });
+      if (!target) {
+        return NextResponse.json({ success: true, data: [] });
+      }
+
+      const phoneMatches = await prisma.customer.findMany({
+        where: {
+          id: { not: custId },
+          isDeleted: false,
+          OR: [
+            { primaryPhone: target.primaryPhone },
+            ...(target.whatsappNumber ? [{ whatsappNumber: target.whatsappNumber }, { primaryPhone: target.whatsappNumber }] : []),
+          ],
+        },
+      });
+
+      const candidates = phoneMatches.map((m) => ({
+        id: m.id,
+        customerNumber: m.customerNumber,
+        fullName: m.fullName,
+        primaryPhone: m.primaryPhone,
+        matchScore: 90,
+        matchReason: 'IDENTICAL_PHONE_NUMBER',
+      }));
+
+      return NextResponse.json({ success: true, data: candidates });
     }
 
     const timelineMatch = path.match(/^customers\/([^/]+)\/timeline$/);
@@ -1159,7 +1537,15 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 
     const consentsMatch = path.match(/^compliance\/customers\/([^/]+)\/consents$/);
     if (consentsMatch) {
-      return NextResponse.json({ success: true, data: [] });
+      const custId = consentsMatch[1];
+      if (!isValidUuid(custId)) {
+        return NextResponse.json({ success: true, data: [] });
+      }
+      const consents = await prisma.customerConsent.findMany({
+        where: { customerId: custId },
+        orderBy: { recordedAt: 'desc' },
+      });
+      return NextResponse.json({ success: true, data: consents });
     }
 
     // 5. REMINDERS LIST
