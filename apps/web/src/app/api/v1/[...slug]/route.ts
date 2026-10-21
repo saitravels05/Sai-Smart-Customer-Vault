@@ -31,6 +31,12 @@ async function verifyPassword(plainText: string, hash: string): Promise<boolean>
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
+// Global BigInt JSON serialization support
+(BigInt.prototype as any).toJSON = function () {
+  const intVal = Number(this);
+  return Number.isSafeInteger(intVal) ? intVal : this.toString();
+};
+
 // JWT Helper
 function verifyJwtToken(authHeader: string | null): any {
   if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
@@ -2002,13 +2008,20 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     const customerMatch = path.match(/^customers\/([^/]+)$/);
     if (customerMatch) {
       const custId = customerMatch[1];
+      const isUuid = isValidUuid(custId);
       const customer = await prisma.customer.findFirst({
-        where: { id: custId, isDeleted: false },
+        where: {
+          ...(isUuid ? { id: custId } : { customerNumber: custId }),
+          isDeleted: false,
+        },
         include: {
           branch: true,
           passports: { orderBy: { createdAt: 'desc' } },
           visas: { orderBy: { createdAt: 'desc' } },
-          documents: { orderBy: { createdAt: 'desc' } },
+          documents: {
+            where: { isDeleted: false },
+            orderBy: { createdAt: 'desc' },
+          },
           bookings: { orderBy: { createdAt: 'desc' } },
           consents: { orderBy: { recordedAt: 'desc' } },
           relationshipsFrom: { include: { relative: true } },
@@ -2026,6 +2039,10 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
           serviceCharge: Number(customer.serviceCharge || 0),
           branchName: customer.branch?.name || 'Madurai Head Office',
           branchCode: customer.branch?.code || 'IXM-HO',
+          documents: (customer.documents || []).map((d) => ({
+            ...d,
+            fileSizeBytes: Number(d.fileSizeBytes),
+          })),
         },
       });
     }
