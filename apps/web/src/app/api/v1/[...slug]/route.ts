@@ -1402,6 +1402,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       let description = '';
       let tags: string[] = [];
 
+      let rawBase64 = '';
+      let rawFileName = '';
+      let rawMimeType = '';
+
       const contentType = req.headers.get('content-type') || '';
       if (contentType.includes('multipart/form-data')) {
         const formData = await req.formData();
@@ -1423,9 +1427,12 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         title = body.title || '';
         description = body.description || '';
         tags = Array.isArray(body.tags) ? body.tags : [];
+        rawBase64 = body.fileBase64 || body.file || '';
+        rawFileName = body.fileName || '';
+        rawMimeType = body.mimeType || '';
       }
 
-      if (!file && !title) {
+      if (!file && !title && !rawBase64) {
         return NextResponse.json({ success: false, error: { message: 'A file must be attached.' } }, { status: 400 });
       }
 
@@ -1444,13 +1451,15 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
       const category = normalizeDocumentCategory(rawCategory);
       const docType = normalizeDocumentType(rawType);
-      const fileName = file ? file.name : (title ? `${title}.pdf` : 'document.pdf');
-      const mimeType = file?.type || (fileName.endsWith('.png') ? 'image/png' : fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') ? 'image/jpeg' : 'application/pdf');
+      const fileName = file ? file.name : (rawFileName || (title ? `${title}.pdf` : 'document.pdf'));
+      const mimeType = file?.type || rawMimeType || (fileName.endsWith('.png') ? 'image/png' : fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') ? 'image/jpeg' : 'application/pdf');
 
       let fileBuffer: Buffer;
       if (file) {
         const arrayBuf = await file.arrayBuffer();
         fileBuffer = Buffer.from(arrayBuf);
+      } else if (rawBase64) {
+        fileBuffer = Buffer.from(rawBase64, 'base64');
       } else {
         fileBuffer = generateFallbackPdf(title || fileName, customer.fullName, docType, crypto.randomBytes(16).toString('hex'));
       }
@@ -2323,6 +2332,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
         data: {
           monthlyRegistrations,
           serviceCategoryBreakdown,
+          categoryBreakdown: serviceCategoryBreakdown,
           branchActivity,
           documentTypeBreakdown: [],
           expiryUrgencyBreakdown: { critical7d: 0, urgent30d: 0, warning180d: 0, expired: 0 },
