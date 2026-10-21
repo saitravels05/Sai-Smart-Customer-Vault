@@ -24,6 +24,7 @@ import {
   FileBadge,
   Layers,
   Sparkles,
+  ExternalLink,
 } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils';
 import { DocumentCategory, DocumentType } from '@sai/shared-types';
@@ -101,6 +102,7 @@ export function DocumentVault({
   const [aiModalDoc, setAiModalDoc] = useState<any | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const replaceFileInputRef = useRef<HTMLInputElement>(null);
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
   const loadDocuments = async () => {
@@ -200,27 +202,40 @@ export function DocumentVault({
     setUploadSuccess(null);
 
     try {
-      const token = localStorage.getItem('sai_access_token');
-      const branchId = localStorage.getItem('sai_active_branch_id');
+      const token = typeof window !== 'undefined' ? localStorage.getItem('sai_access_token') : '';
+      const branchId = typeof window !== 'undefined' ? localStorage.getItem('sai_active_branch_id') : '';
 
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('customerId', customerId);
-      formData.append('category', uploadCategory);
-      formData.append('type', uploadType);
-      formData.append('title', uploadTitle || selectedFile.name);
-      if (uploadDescription) formData.append('description', uploadDescription);
-      if (uploadTags) formData.append('tags', uploadTags);
+      // Convert file to base64 so it is 100% reliably persisted and never dropped by boundary issues
+      const base64Data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const res = reader.result as string;
+          const b64 = res.includes(',') ? res.split(',')[1] : res;
+          resolve(b64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(selectedFile);
+      });
 
-      await axios.post(`${apiBaseUrl}/documents/upload`, formData, {
+      await axios.post(`${apiBaseUrl}/documents/upload`, {
+        customerId,
+        category: uploadCategory,
+        type: uploadType,
+        title: uploadTitle || selectedFile.name,
+        description: uploadDescription,
+        tags: uploadTags ? uploadTags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+        fileBase64: base64Data,
+        fileName: selectedFile.name,
+        mimeType: selectedFile.type || (selectedFile.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+      }, {
         headers: {
           Authorization: `Bearer ${token}`,
           'X-Branch-Id': branchId || '',
-          'Content-Type': 'multipart/form-data',
+          'Content-Type': 'application/json',
         },
       });
 
-      setUploadSuccess(`"${uploadTitle}" successfully encrypted and secured in vault.`);
+      setUploadSuccess(`"${uploadTitle || selectedFile.name}" successfully encrypted and secured in vault.`);
       setShowUploadModal(false);
       setSelectedFile(null);
       setUploadTitle('');
@@ -232,6 +247,55 @@ export function DocumentVault({
       setUploadError(err.response?.data?.message || err.message || 'Upload failed.');
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleReplaceDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !previewDoc) return;
+    setIsPreviewLoading(true);
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('sai_access_token') : '';
+      const branchId = typeof window !== 'undefined' ? localStorage.getItem('sai_active_branch_id') : '';
+
+      const base64Data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const res = reader.result as string;
+          const b64 = res.includes(',') ? res.split(',')[1] : res;
+          resolve(b64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const res = await axios.post(`${apiBaseUrl}/documents/${previewDoc.id}/replace`, {
+        fileBase64: base64Data,
+        fileName: file.name,
+        mimeType: file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'X-Branch-Id': branchId || '',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (res.data?.data) {
+        setPreviewDoc((prev: any) => ({
+          ...prev,
+          ...res.data.data,
+          currentVersion: res.data.data.currentVersion,
+        }));
+        await reloadPreviewWithWatermark(previewWatermark);
+        loadDocuments();
+        if (onDocumentChange) onDocumentChange();
+      }
+    } catch (err: any) {
+      alert(`Document replacement failed: ${err.message}`);
+    } finally {
+      setIsPreviewLoading(false);
+      if (replaceFileInputRef.current) replaceFileInputRef.current.value = '';
     }
   };
 
@@ -330,9 +394,11 @@ export function DocumentVault({
         },
       );
 
-      const blob = new Blob([res.data], { type: doc.mimeType });
+      const contentType = (res.headers ? (res.headers['content-type'] || (res.headers as any).get?.('content-type')) : null) || doc.mimeType || 'application/pdf';
+      const blob = new Blob([res.data], { type: contentType });
       const objectUrl = window.URL.createObjectURL(blob);
       setPreviewUrl(objectUrl);
+      setPreviewDoc((prev: any) => ({ ...prev, mimeType: contentType }));
 
       // Also load access audit logs
       const logsRes = await axios.get(`${apiBaseUrl}/documents/${doc.id}/logs`, {
@@ -371,9 +437,11 @@ export function DocumentVault({
         },
       );
 
-      const blob = new Blob([res.data], { type: previewDoc.mimeType });
+      const contentType = (res.headers ? (res.headers['content-type'] || (res.headers as any).get?.('content-type')) : null) || previewDoc.mimeType || 'application/pdf';
+      const blob = new Blob([res.data], { type: contentType });
       const objectUrl = window.URL.createObjectURL(blob);
       setPreviewUrl(objectUrl);
+      setPreviewDoc((prev: any) => ({ ...prev, mimeType: contentType }));
     } catch (err: any) {
       console.error('Failed to reload preview:', err);
     } finally {
@@ -862,27 +930,58 @@ export function DocumentVault({
                 </p>
               </div>
 
-              {/* Watermark Toggle & Download Controls */}
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 select-none">
+              {/* Actions: Replace, Full Page, Watermark Toggle & Download Controls */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  ref={replaceFileInputRef}
+                  onChange={handleReplaceDocument}
+                  className="hidden"
+                  accept=".pdf,.png,.jpg,.jpeg,.webp"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => replaceFileInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 text-xs font-semibold hover:bg-slate-100 hover:text-slate-900 transition shadow-2xs"
+                  title="Upload / Replace with exact file from your computer"
+                >
+                  <UploadCloud className="w-3.5 h-3.5 text-[#E85A18]" />
+                  <span>Replace Document</span>
+                </button>
+
+                {previewUrl && (
+                  <button
+                    type="button"
+                    onClick={() => window.open(previewUrl, '_blank')}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 text-xs font-semibold hover:bg-slate-100 hover:text-slate-900 transition shadow-2xs"
+                    title="Open exact document in new browser tab"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Full Tab</span>
+                  </button>
+                )}
+
+                <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-slate-700 select-none px-2.5 py-1.5 rounded-lg bg-slate-100 border border-slate-200 hover:bg-slate-200 transition">
                   <input
                     type="checkbox"
                     checked={previewWatermark}
                     onChange={(e) => reloadPreviewWithWatermark(e.target.checked)}
                     className="w-3.5 h-3.5 rounded text-[#E85A18]"
                   />
-                  <span>Watermark Preview</span>
+                  <span>Watermark</span>
                 </label>
 
                 <button
+                  type="button"
                   onClick={() => downloadSingleDoc(previewDoc.id, previewDoc.title, previewWatermark)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0B192C] text-white text-xs font-semibold hover:bg-slate-800 transition"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#0B192C] text-white text-xs font-semibold hover:bg-slate-800 transition shadow-xs"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>Download</span>
                 </button>
 
-                <button onClick={closePreview} className="text-slate-400 hover:text-slate-600 p-1">
+                <button onClick={closePreview} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -918,11 +1017,11 @@ export function DocumentVault({
               {isPreviewLoading ? (
                 <div className="flex flex-col items-center gap-2 text-xs text-slate-500">
                   <Loader2 className="w-8 h-8 animate-spin text-[#E85A18]" />
-                  <span>Applying dynamic watermarking & loading viewer...</span>
+                  <span>Rendering exact document preview...</span>
                 </div>
               ) : activeModalTab === 'preview' ? (
                 previewUrl ? (
-                  previewDoc.mimeType === 'application/pdf' ? (
+                  (previewDoc.mimeType?.includes('pdf') || previewDoc.title?.toLowerCase().endsWith('.pdf')) ? (
                     <iframe
                       src={`${previewUrl}#toolbar=0`}
                       className="w-full h-full rounded-lg bg-white shadow-sm border border-slate-200"

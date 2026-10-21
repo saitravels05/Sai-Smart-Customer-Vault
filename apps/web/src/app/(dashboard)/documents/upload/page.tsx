@@ -17,6 +17,8 @@ import {
   Sparkles,
   Building2,
   User,
+  Eye,
+  Download,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { useLanguage } from '@/context/language-context';
@@ -73,19 +75,26 @@ export default function DocumentUploadPage() {
       setIsUploading(true);
       setErrorMessage(null);
 
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('customerId', selectedCustomerId);
-      formData.append('category', category);
-      formData.append('type', docType);
-      if (title.trim()) {
-        formData.append('title', title.trim());
-      }
+      // Convert file to base64 so exact binary is permanently persisted
+      const base64Data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const res = reader.result as string;
+          const b64 = res.includes(',') ? res.split(',')[1] : res;
+          resolve(b64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
 
-      const res: any = await apiClient.post('/documents/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+      const res: any = await apiClient.post('/documents/upload', {
+        customerId: selectedCustomerId,
+        category,
+        type: docType,
+        title: title.trim() || file.name,
+        fileBase64: base64Data,
+        fileName: file.name,
+        mimeType: file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
       });
 
       setUploadSuccess(res.data || res);
@@ -141,20 +150,29 @@ export default function DocumentUploadPage() {
               Document has been scanned clean, encrypted with AES-256-GCM, and placed into the client vault.
             </p>
           </div>
-          <div className="pt-2 flex justify-center gap-3">
+          <div className="pt-2 flex flex-wrap justify-center gap-3">
             <Link
-              href="/documents"
-              className="px-4 py-2 bg-[#0B192C] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition"
+              href={`/customers/${selectedCustomerId}?tab=documents`}
+              className="px-4 py-2 bg-[#E85A18] hover:bg-[#D44E0F] text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm"
             >
-              <span>View In Vault</span>
+              <Eye className="w-3.5 h-3.5" />
+              <span>Preview In Vault</span>
             </Link>
+            <a
+              href={`/api/v1/documents/${(uploadSuccess as any).data?.id || (uploadSuccess as any).id}/download`}
+              download
+              className="px-4 py-2 bg-[#0B192C] hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-sm"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Download File</span>
+            </a>
             <button
               onClick={() => {
                 setUploadSuccess(null);
                 setFile(null);
                 setTitle('');
               }}
-              className="px-4 py-2 bg-[#E85A18] hover:bg-[#D44E0F] text-white rounded-xl text-xs font-bold transition"
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition"
             >
               <span>+ Upload Another Document</span>
             </button>
