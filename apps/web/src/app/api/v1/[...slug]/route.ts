@@ -73,6 +73,11 @@ function getAuthUser(req: NextRequest): any {
     const verified = verifyJwtToken(authHeader);
     if (verified) return verified;
   }
+  const queryToken = req.nextUrl.searchParams.get('token');
+  if (queryToken) {
+    const verified = verifyJwtToken(`Bearer ${queryToken}`);
+    if (verified) return verified;
+  }
   const cookie = req.cookies.get('sai_session_token')?.value;
   if (cookie) {
     const verified = verifyJwtToken(`Bearer ${cookie}`);
@@ -2839,8 +2844,15 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       }
 
       const authUser = getAuthUser(req);
+      if (!authUser) {
+        return NextResponse.json(
+          { success: false, error: { message: 'Authentication required to access documents.' } },
+          { status: 401 },
+        );
+      }
+
       // Branch isolation: staff can only download documents for their branch
-      if (authUser && authUser.role !== 'OWNER' && authUser.branchId && doc.branchId && authUser.branchId !== doc.branchId) {
+      if (authUser.role !== 'OWNER' && authUser.branchId && doc.branchId && authUser.branchId !== doc.branchId) {
         return NextResponse.json({ success: false, error: { message: 'Access denied: document belongs to another branch.' } }, { status: 403 });
       }
 
