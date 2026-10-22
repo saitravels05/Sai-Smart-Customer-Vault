@@ -87,6 +87,27 @@ export default function DocumentUploadPage() {
         reader.readAsDataURL(file);
       });
 
+      const getMime = (f: File) => {
+        if (f.type && f.type !== 'application/octet-stream') return f.type;
+        const ext = f.name.slice(f.name.lastIndexOf('.')).toLowerCase();
+        const map: Record<string, string> = {
+          '.pdf': 'application/pdf',
+          '.png': 'image/png',
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.webp': 'image/webp',
+          '.doc': 'application/msword',
+          '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          '.xls': 'application/vnd.ms-excel',
+          '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          '.ppt': 'application/vnd.ms-powerpoint',
+          '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          '.txt': 'text/plain',
+          '.csv': 'text/csv',
+        };
+        return map[ext] || 'application/octet-stream';
+      };
+
       const res: any = await apiClient.post('/documents/upload', {
         customerId: selectedCustomerId,
         category,
@@ -94,7 +115,7 @@ export default function DocumentUploadPage() {
         title: title.trim() || file.name,
         fileBase64: base64Data,
         fileName: file.name,
-        mimeType: file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+        mimeType: getMime(file),
       });
 
       setUploadSuccess(res.data || res);
@@ -261,13 +282,13 @@ export default function DocumentUploadPage() {
 
           {/* Drag & Drop File Zone */}
           <div className="space-y-1 text-xs">
-            <label className="font-semibold text-slate-700">Select File (PDF, PNG, JPG up to 25MB) *</label>
+            <label className="font-semibold text-slate-700">Select File (PDF, Images, Office Docs up to 25MB) *</label>
             <div className="border-2 border-dashed border-slate-300 rounded-2xl p-6 text-center hover:border-[#E85A18] transition bg-slate-50/50">
               <input
                 type="file"
                 id="file-upload"
                 onChange={handleFileChange}
-                accept=".pdf,.png,.jpg,.jpeg,.webp"
+                accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
                 className="hidden"
               />
               <label htmlFor="file-upload" className="cursor-pointer space-y-2 block">

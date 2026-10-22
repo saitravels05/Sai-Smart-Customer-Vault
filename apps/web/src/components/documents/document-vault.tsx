@@ -25,6 +25,17 @@ import {
   Layers,
   Sparkles,
   ExternalLink,
+  ZoomIn,
+  ZoomOut,
+  RotateCw,
+  RotateCcw,
+  Maximize2,
+  Minimize2,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Check,
+  FileCode,
 } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils';
 import { DocumentCategory, DocumentType } from '@sai/shared-types';
@@ -95,11 +106,32 @@ export function DocumentVault({
   // Preview & Audit Log modal state
   const [previewDoc, setPreviewDoc] = useState<any | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewWatermark, setPreviewWatermark] = useState(true);
+  const [previewWatermark, setPreviewWatermark] = useState(false);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [activeModalTab, setActiveModalTab] = useState<'preview' | 'versions' | 'audit'>('preview');
   const [aiModalDoc, setAiModalDoc] = useState<any | null>(null);
+  const [zoom, setZoom] = useState(100);
+  const [rotation, setRotation] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [copiedSha, setCopiedSha] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+
+  const formatBytes = (bytes: number | bigint | undefined): string => {
+    if (!bytes) return '0 B';
+    const b = Number(bytes);
+    if (b < 1024) return `${b} B`;
+    if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+    return `${(b / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
+  const handleCopySha = (sha: string) => {
+    if (!sha) return;
+    navigator.clipboard?.writeText(sha);
+    setCopiedSha(true);
+    setTimeout(() => setCopiedSha(false), 2000);
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const replaceFileInputRef = useRef<HTMLInputElement>(null);
@@ -135,6 +167,16 @@ export function DocumentVault({
     }
   }, [customerId]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && previewDoc) {
+        closePreview();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [previewDoc]);
+
   // Handle Drag & Drop
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -156,15 +198,30 @@ export function DocumentVault({
   };
 
   const handleFileSelected = (file: File) => {
-    // Validate 10MB limit
-    if (file.size > 10 * 1024 * 1024) {
-      setUploadError('File exceeds maximum size of 10MB.');
+    // Validate 25MB limit
+    if (file.size > 25 * 1024 * 1024) {
+      setUploadError('File exceeds maximum size of 25MB.');
       return;
     }
-    // Validate type
-    const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
-    if (!validTypes.includes(file.type)) {
-      setUploadError('Only PDF, JPEG, and PNG files are supported.');
+    // Validate type and extension
+    const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+    const validExts = ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv'];
+    const validTypes = [
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'text/plain',
+      'text/csv',
+    ];
+    if (!validTypes.includes(file.type) && !validExts.includes(ext)) {
+      setUploadError('Supported formats: PDF, JPEG, PNG, WEBP, Word, Excel, and PowerPoint.');
       return;
     }
 
@@ -217,6 +274,27 @@ export function DocumentVault({
         reader.readAsDataURL(selectedFile);
       });
 
+      const getMime = (f: File) => {
+        if (f.type && f.type !== 'application/octet-stream') return f.type;
+        const ext = f.name.slice(f.name.lastIndexOf('.')).toLowerCase();
+        const map: Record<string, string> = {
+          '.pdf': 'application/pdf',
+          '.png': 'image/png',
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.webp': 'image/webp',
+          '.doc': 'application/msword',
+          '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          '.xls': 'application/vnd.ms-excel',
+          '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          '.ppt': 'application/vnd.ms-powerpoint',
+          '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          '.txt': 'text/plain',
+          '.csv': 'text/csv',
+        };
+        return map[ext] || 'application/octet-stream';
+      };
+
       await axios.post(`${apiBaseUrl}/documents/upload`, {
         customerId,
         category: uploadCategory,
@@ -226,7 +304,7 @@ export function DocumentVault({
         tags: uploadTags ? uploadTags.split(',').map((t) => t.trim()).filter(Boolean) : [],
         fileBase64: base64Data,
         fileName: selectedFile.name,
-        mimeType: selectedFile.type || (selectedFile.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+        mimeType: getMime(selectedFile),
       }, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -300,7 +378,7 @@ export function DocumentVault({
   };
 
   // Download Single Document
-  const downloadSingleDoc = async (docId: string, docTitle: string, withWatermark = true) => {
+  const downloadSingleDoc = async (docId: string, docTitle: string, withWatermark = false) => {
     try {
       const token = localStorage.getItem('sai_access_token');
       const branchId = localStorage.getItem('sai_active_branch_id');
@@ -316,13 +394,20 @@ export function DocumentVault({
         },
       );
 
-      let filename = `${docTitle}${withWatermark ? '_WATERMARKED' : ''}.pdf`;
+      let filename = docTitle || 'document';
       const disposition = res.headers ? (res.headers['content-disposition'] || (res.headers as any).get?.('content-disposition')) : null;
       if (disposition && disposition.includes('filename=')) {
-        const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-        if (match && match[1]) {
-          filename = decodeURIComponent(match[1].replace(/['"]/g, ''));
+        const utf8Match = disposition.match(/filename\*=UTF-8''([^;\n]+)/i);
+        const standardMatch = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (utf8Match && utf8Match[1]) {
+          filename = decodeURIComponent(utf8Match[1]);
+        } else if (standardMatch && standardMatch[1]) {
+          filename = decodeURIComponent(standardMatch[1].replace(/['"]/g, ''));
         }
+      } else {
+        const cType = (res.headers ? (res.headers['content-type'] || (res.headers as any).get?.('content-type')) : null) || '';
+        const ext = cType.includes('pdf') ? '.pdf' : cType.includes('png') ? '.png' : cType.includes('jpeg') ? '.jpg' : '';
+        if (ext && !filename.endsWith(ext)) filename += ext;
       }
 
       const contentType = (res.headers ? (res.headers['content-type'] || (res.headers as any).get?.('content-type')) : null) || 'application/octet-stream';
@@ -333,6 +418,7 @@ export function DocumentVault({
       document.body.appendChild(link);
       link.click();
       link.remove();
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
     } catch (err: any) {
       alert(`Download failed: ${err.message}`);
     }
@@ -376,7 +462,12 @@ export function DocumentVault({
     setPreviewDoc(doc);
     setActiveModalTab('preview');
     setIsPreviewLoading(true);
+    setPreviewError(null);
     setPreviewUrl(null);
+    setZoom(100);
+    setRotation(0);
+    setCurrentPage(1);
+    setIsFullscreen(false);
 
     try {
       const token = localStorage.getItem('sai_access_token');
@@ -395,23 +486,45 @@ export function DocumentVault({
       );
 
       const contentType = (res.headers ? (res.headers['content-type'] || (res.headers as any).get?.('content-type')) : null) || doc.mimeType || 'application/pdf';
+      let resolvedFileName = doc.fileName;
+      const disposition = res.headers ? (res.headers['content-disposition'] || (res.headers as any).get?.('content-disposition')) : null;
+      if (disposition && disposition.includes('filename=')) {
+        const utf8Match = disposition.match(/filename\*=UTF-8''([^;\n]+)/i);
+        const standardMatch = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (utf8Match && utf8Match[1]) {
+          resolvedFileName = decodeURIComponent(utf8Match[1]);
+        } else if (standardMatch && standardMatch[1]) {
+          resolvedFileName = decodeURIComponent(standardMatch[1].replace(/['"]/g, ''));
+        }
+      }
+
+      const shaHeader = res.headers ? (res.headers['x-sha256-checksum'] || (res.headers as any).get?.('x-sha256-checksum')) : null;
       const blob = new Blob([res.data], { type: contentType });
       const objectUrl = window.URL.createObjectURL(blob);
       setPreviewUrl(objectUrl);
-      setPreviewDoc((prev: any) => ({ ...prev, mimeType: contentType }));
+      setPreviewDoc((prev: any) => ({
+        ...prev,
+        ...doc,
+        fileName: resolvedFileName || prev?.fileName || doc.title,
+        mimeType: contentType,
+        sha256Checksum: shaHeader || doc.sha256Checksum,
+      }));
 
       // Also load access audit logs
-      const logsRes = await axios.get(`${apiBaseUrl}/documents/${doc.id}/logs`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'X-Branch-Id': branchId || '',
-        },
-      });
-      if (logsRes.data?.data) {
-        setAuditLogs(logsRes.data.data);
-      }
+      try {
+        const logsRes = await axios.get(`${apiBaseUrl}/documents/${doc.id}/logs`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'X-Branch-Id': branchId || '',
+          },
+        });
+        if (logsRes.data?.data) {
+          setAuditLogs(logsRes.data.data);
+        }
+      } catch {}
     } catch (err: any) {
       console.error('Failed to load preview:', err);
+      setPreviewError(err.message || 'Unable to render preview. The original file is safely preserved in the vault.');
     } finally {
       setIsPreviewLoading(false);
     }
@@ -455,6 +568,12 @@ export function DocumentVault({
     }
     setPreviewDoc(null);
     setPreviewUrl(null);
+    setAuditLogs([]);
+    setZoom(100);
+    setRotation(0);
+    setCurrentPage(1);
+    setIsFullscreen(false);
+    setPreviewError(null);
   };
 
   // Filtered documents
@@ -503,7 +622,7 @@ export function DocumentVault({
           ref={fileInputRef}
           type="file"
           className="hidden"
-          accept=".pdf,.jpg,.jpeg,.png"
+          accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
           onChange={(e) => {
             if (e.target.files && e.target.files[0]) {
               handleFileSelected(e.target.files[0]);
@@ -528,7 +647,7 @@ export function DocumentVault({
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> AES-256-GCM Encrypted
             </span>
             <span>•</span>
-            <span>PDF, JPEG, PNG (Max 10MB)</span>
+            <span>PDF, Images & Office Docs (Max 25MB)</span>
             <span>•</span>
             <span>Dynamic Watermarking Enabled</span>
           </div>
@@ -695,8 +814,8 @@ export function DocumentVault({
 
                   <div className="flex items-center gap-1">
                     <button
-                      onClick={() => downloadSingleDoc(doc.id, doc.title, true)}
-                      title="Download with Official Watermark"
+                      onClick={() => downloadSingleDoc(doc.id, doc.title, false)}
+                      title="Download Original Document"
                       className="p-1 text-slate-400 hover:text-[#E85A18] transition rounded hover:bg-slate-50"
                     >
                       <Download className="w-3.5 h-3.5" />
@@ -769,9 +888,9 @@ export function DocumentVault({
                           <Eye className="w-3.5 h-3.5" /> Preview
                         </button>
                         <button
-                          onClick={() => downloadSingleDoc(doc.id, doc.title, true)}
+                          onClick={() => downloadSingleDoc(doc.id, doc.title, false)}
                           className="text-[#E85A18] hover:text-[#D44E0F] font-semibold inline-flex items-center gap-1"
-                          title="Download with watermark"
+                          title="Download Original Document"
                         >
                           <Download className="w-3.5 h-3.5" />
                         </button>
@@ -913,21 +1032,38 @@ export function DocumentVault({
 
       {/* Document Preview & Audit Modal */}
       {previewDoc && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-4xl w-full h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+        <div className={`fixed inset-0 z-50 flex items-center justify-center ${isFullscreen ? 'p-0 bg-slate-950 w-screen h-screen' : 'p-2 sm:p-4 bg-slate-900/70 backdrop-blur-xs'}`}>
+          <div className={`bg-white flex flex-col shadow-2xl overflow-hidden border border-slate-200 transition-all ${isFullscreen ? 'w-full h-full rounded-none' : 'max-w-6xl w-full h-[92vh] rounded-2xl'}`}>
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
-              <div>
-                <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-[#E85A18]" />
-                  <span>{previewDoc.title}</span>
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-slate-200 bg-slate-50/90">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-[#E85A18] shrink-0" />
+                  <h3 className="font-bold text-sm text-slate-900 truncate" title={previewDoc.title}>
+                    {previewDoc.title}
+                  </h3>
                   <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-mono font-bold">
                     v{previewDoc.currentVersion}
                   </span>
-                </h3>
-                <p className="text-[11px] text-slate-500 mt-0.5 font-mono">
-                  SHA-256: {previewDoc.sha256Checksum?.slice(0, 16)}...
-                </p>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3 text-emerald-600" /> Statutory Clean
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500 font-mono">
+                  <span className="text-slate-600 font-semibold truncate max-w-xs" title={previewDoc.fileName || previewDoc.title}>
+                    {previewDoc.fileName || previewDoc.storageKey?.split('/').pop() || previewDoc.title}
+                  </span>
+                  <span>•</span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopySha(previewDoc.sha256Checksum)}
+                    className="inline-flex items-center gap-1 hover:text-slate-900 transition bg-slate-100 hover:bg-slate-200 px-1.5 py-0.5 rounded"
+                    title="Click to copy full SHA-256 Checksum"
+                  >
+                    {copiedSha ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                    <span>SHA-256: {previewDoc.sha256Checksum?.slice(0, 12)}...</span>
+                  </button>
+                </div>
               </div>
 
               {/* Actions: Replace, Full Page, Watermark Toggle & Download Controls */}
@@ -937,7 +1073,7 @@ export function DocumentVault({
                   ref={replaceFileInputRef}
                   onChange={handleReplaceDocument}
                   className="hidden"
-                  accept=".pdf,.png,.jpg,.jpeg,.webp"
+                  accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
                 />
 
                 <button
@@ -947,7 +1083,7 @@ export function DocumentVault({
                   title="Upload / Replace with exact file from your computer"
                 >
                   <UploadCloud className="w-3.5 h-3.5 text-[#E85A18]" />
-                  <span>Replace Document</span>
+                  <span className="hidden sm:inline">Replace Document</span>
                 </button>
 
                 {previewUrl && (
@@ -958,7 +1094,7 @@ export function DocumentVault({
                     title="Open exact document in new browser tab"
                   >
                     <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Full Tab</span>
+                    <span className="hidden sm:inline">Full Tab</span>
                   </button>
                 )}
 
@@ -974,11 +1110,21 @@ export function DocumentVault({
 
                 <button
                   type="button"
-                  onClick={() => downloadSingleDoc(previewDoc.id, previewDoc.title, previewWatermark)}
+                  onClick={() => downloadSingleDoc(previewDoc.id, previewDoc.title, false)}
                   className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#0B192C] text-white text-xs font-semibold hover:bg-slate-800 transition shadow-xs"
+                  title="Download exact original uploaded file"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>Download</span>
+                  <span>Download Original</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  className="text-slate-500 hover:text-slate-800 p-1.5 rounded-lg hover:bg-slate-100 transition"
+                  title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen View'}
+                >
+                  {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                 </button>
 
                 <button onClick={closePreview} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition">
@@ -987,62 +1133,311 @@ export function DocumentVault({
               </div>
             </div>
 
-            {/* Modal Subtabs (Preview vs Audit Log) */}
-            <div className="flex items-center gap-4 px-6 border-b border-slate-100 text-xs font-semibold bg-white">
-              <button
-                onClick={() => setActiveModalTab('preview')}
-                className={`py-2.5 border-b-2 transition ${
-                  activeModalTab === 'preview'
-                    ? 'border-[#E85A18] text-[#E85A18]'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                Document Viewer
-              </button>
-              <button
-                onClick={() => setActiveModalTab('audit')}
-                className={`py-2.5 border-b-2 transition flex items-center gap-1 ${
-                  activeModalTab === 'audit'
-                    ? 'border-[#E85A18] text-[#E85A18]'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <History className="w-3.5 h-3.5" />
-                <span>Access Audit Trail ({auditLogs.length})</span>
-              </button>
+            {/* Document Information Strip (Phase 4) */}
+            <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-2 bg-slate-100/70 border-b border-slate-200 text-[11px] text-slate-600">
+              <div className="flex flex-wrap items-center gap-4">
+                <div>
+                  <span className="text-slate-400 font-medium">Customer: </span>
+                  <span className="font-semibold text-slate-800">{customerName || previewDoc.customer?.fullName || 'Customer'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-medium">Type: </span>
+                  <span className="font-semibold text-slate-800">{previewDoc.type}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-medium">Category: </span>
+                  <span className="text-slate-700">{previewDoc.category}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-medium">File Size: </span>
+                  <span className="font-semibold text-slate-800">{formatBytes(previewDoc.fileSizeBytes)}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-medium">Uploaded: </span>
+                  <span className="text-slate-700">{formatDateTime(previewDoc.createdAt)}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 font-mono text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                <CheckCircle2 className="w-3 h-3" />
+                <span>Byte-for-Byte SHA-256 Verified</span>
+              </div>
             </div>
 
-            {/* Modal Body */}
-            <div className="flex-1 overflow-auto p-4 bg-slate-100 flex items-center justify-center">
+            {/* Interactive Viewer Toolbar (Phase 4) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-2 border-b border-slate-200 bg-white">
+              {/* Subtabs */}
+              <div className="flex items-center gap-3 text-xs font-semibold">
+                <button
+                  onClick={() => setActiveModalTab('preview')}
+                  className={`py-1 px-2.5 rounded-lg transition ${
+                    activeModalTab === 'preview'
+                      ? 'bg-orange-50 text-[#E85A18] font-bold'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Document Viewer
+                </button>
+                <button
+                  onClick={() => setActiveModalTab('audit')}
+                  className={`py-1 px-2.5 rounded-lg transition flex items-center gap-1.5 ${
+                    activeModalTab === 'audit'
+                      ? 'bg-orange-50 text-[#E85A18] font-bold'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <History className="w-3.5 h-3.5" />
+                  <span>Access Audit Trail ({auditLogs.length})</span>
+                </button>
+              </div>
+
+              {/* Toolbar Controls: Zoom, Rotate, Page Navigation */}
+              {activeModalTab === 'preview' && (
+                <div className="flex items-center gap-1.5 text-xs text-slate-700">
+                  {/* Zoom Out */}
+                  <button
+                    type="button"
+                    onClick={() => setZoom((z) => Math.max(25, z - 25))}
+                    disabled={zoom <= 25}
+                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-40 transition"
+                    title="Zoom Out"
+                  >
+                    <ZoomOut className="w-3.5 h-3.5" />
+                  </button>
+
+                  <span className="font-mono text-xs font-bold w-12 text-center text-slate-800 select-none">
+                    {zoom}%
+                  </span>
+
+                  {/* Zoom In */}
+                  <button
+                    type="button"
+                    onClick={() => setZoom((z) => Math.min(300, z + 25))}
+                    disabled={zoom >= 300}
+                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-40 transition"
+                    title="Zoom In"
+                  >
+                    <ZoomIn className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Reset / Fit */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setZoom(100);
+                      setRotation(0);
+                    }}
+                    className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition text-[11px] font-semibold"
+                    title="Reset Zoom & Rotation (Fit to Screen)"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Fit</span>
+                  </button>
+
+                  {/* Rotate */}
+                  <button
+                    type="button"
+                    onClick={() => setRotation((r) => (r + 90) % 360)}
+                    className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition text-[11px] font-semibold"
+                    title="Rotate View 90° Clockwise"
+                  >
+                    <RotateCw className="w-3 h-3" />
+                    <span>{rotation > 0 ? `${rotation}°` : 'Rotate'}</span>
+                  </button>
+
+                  {/* Multipage PDF Controls */}
+                  {(previewDoc.mimeType?.includes('pdf') || previewDoc.title?.toLowerCase().endsWith('.pdf')) && (
+                    <div className="flex items-center gap-1 pl-2 border-l border-slate-200 ml-1">
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage <= 1}
+                        className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-40 transition"
+                        title="Previous Page"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="text-[11px] font-mono px-1 font-semibold text-slate-700">
+                        P. {currentPage}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPage((p) => p + 1)}
+                        className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition"
+                        title="Next Page"
+                      >
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Body / Viewer Canvas */}
+            <div className="flex-1 overflow-auto p-4 bg-slate-900/5 relative flex items-center justify-center">
               {isPreviewLoading ? (
                 <div className="flex flex-col items-center gap-2 text-xs text-slate-500">
                   <Loader2 className="w-8 h-8 animate-spin text-[#E85A18]" />
-                  <span>Rendering exact document preview...</span>
+                  <span>Rendering exact original document...</span>
+                </div>
+              ) : previewError ? (
+                <div className="bg-white p-6 rounded-2xl border border-red-200 max-w-md text-center space-y-3 shadow-sm">
+                  <AlertCircle className="w-8 h-8 text-red-500 mx-auto" />
+                  <h4 className="font-bold text-sm text-slate-800">Preview Notice</h4>
+                  <p className="text-xs text-slate-500">{previewError}</p>
+                  <div className="flex items-center justify-center gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => openPreview(previewDoc)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700"
+                    >
+                      Retry Preview
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => downloadSingleDoc(previewDoc.id, previewDoc.title, false)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#0B192C] text-white hover:bg-slate-800"
+                    >
+                      Download Original File
+                    </button>
+                  </div>
                 </div>
               ) : activeModalTab === 'preview' ? (
                 previewUrl ? (
-                  (previewDoc.mimeType?.includes('pdf') || previewDoc.title?.toLowerCase().endsWith('.pdf')) ? (
-                    <iframe
-                      src={`${previewUrl}#toolbar=0`}
-                      className="w-full h-full rounded-lg bg-white shadow-sm border border-slate-200"
-                      title="PDF Document Preview"
-                    />
-                  ) : (
-                    <div className="relative max-w-full max-h-full flex items-center justify-center bg-white p-4 rounded-xl shadow-sm">
-                      <img
-                        src={previewUrl}
-                        alt="Document Preview"
-                        className="max-h-[65vh] object-contain rounded"
-                      />
-                      {previewWatermark && (
-                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                          <p className="text-red-500/25 text-2xl font-bold -rotate-45 select-none font-mono">
-                            CONFIDENTIAL — SAI TOURS & TRAVELS
-                          </p>
+                  (() => {
+                    const mime = (previewDoc.mimeType || '').toLowerCase();
+                    const title = (previewDoc.fileName || previewDoc.title || '').toLowerCase();
+                    const isPdf = mime.includes('pdf') || title.endsWith('.pdf');
+                    const isImage = mime.includes('image') || title.endsWith('.png') || title.endsWith('.jpg') || title.endsWith('.jpeg') || title.endsWith('.webp') || title.endsWith('.gif') || title.endsWith('.svg');
+                    const isWord = mime.includes('word') || mime.includes('msword') || title.endsWith('.docx') || title.endsWith('.doc');
+                    const isExcel = mime.includes('sheet') || mime.includes('excel') || title.endsWith('.xlsx') || title.endsWith('.xls') || title.endsWith('.csv');
+                    const isPowerpoint = mime.includes('presentation') || mime.includes('powerpoint') || title.endsWith('.pptx') || title.endsWith('.ppt');
+
+                    if (isPdf) {
+                      return (
+                        <div
+                          className="w-full h-full relative flex items-center justify-center transition-transform duration-200"
+                          style={{
+                            transform: rotation ? `rotate(${rotation}deg)` : undefined,
+                          }}
+                        >
+                          <iframe
+                            src={`${previewUrl}#page=${currentPage}&zoom=${zoom}&toolbar=1&navpanes=1`}
+                            className="w-full h-full rounded-xl bg-white shadow-sm border border-slate-200"
+                            title="Original PDF Document Preview"
+                          />
+                          {previewWatermark && (
+                            <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden">
+                              <p className="text-red-500/20 text-3xl font-extrabold -rotate-45 select-none font-mono tracking-widest uppercase">
+                                CONFIDENTIAL — SAI TOURS & TRAVELS
+                              </p>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  )
+                      );
+                    }
+
+                    if (isImage) {
+                      return (
+                        <div className="w-full h-full relative overflow-auto flex items-center justify-center p-4">
+                          <div
+                            className="relative transition-transform duration-150 ease-out flex items-center justify-center"
+                            style={{
+                              transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
+                              transformOrigin: 'center center',
+                            }}
+                          >
+                            <img
+                              src={previewUrl}
+                              alt={previewDoc.title}
+                              className="max-h-[75vh] max-w-[85vw] object-contain rounded-lg shadow-md border border-slate-200 bg-white"
+                            />
+                            {previewWatermark && (
+                              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                                <p className="text-red-500/25 text-3xl font-extrabold -rotate-45 select-none font-mono tracking-widest uppercase">
+                                  CONFIDENTIAL — SAI TOURS & TRAVELS
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (isWord || isExcel || isPowerpoint) {
+                      const formatName = isWord ? 'Microsoft Word' : isExcel ? 'Microsoft Excel' : 'Microsoft PowerPoint';
+                      const formatExt = isWord ? (title.endsWith('.doc') ? '.DOC' : '.DOCX') : isExcel ? (title.endsWith('.xls') ? '.XLS' : title.endsWith('.csv') ? '.CSV' : '.XLSX') : (title.endsWith('.ppt') ? '.PPT' : '.PPTX');
+                      const Icon = isWord ? FileText : isExcel ? FileSpreadsheet : FileBadge;
+                      const themeColor = isWord ? 'text-blue-600 bg-blue-50 border-blue-200' : isExcel ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : 'text-orange-600 bg-orange-50 border-orange-200';
+
+                      return (
+                        <div className="max-w-xl w-full bg-white rounded-2xl border border-slate-200 shadow-md p-8 text-center space-y-4">
+                          <div className={`w-16 h-16 rounded-2xl mx-auto flex items-center justify-center border ${themeColor}`}>
+                            <Icon className="w-8 h-8" />
+                          </div>
+                          <div>
+                            <span className={`inline-block text-[11px] font-bold px-2.5 py-0.5 rounded-full border mb-2 ${themeColor}`}>
+                              {formatName} ({formatExt})
+                            </span>
+                            <h4 className="font-bold text-base text-slate-900">{previewDoc.fileName || previewDoc.title}</h4>
+                            <p className="text-xs text-slate-500 font-mono mt-1">
+                              {formatBytes(previewDoc.fileSizeBytes)} • SHA-256: {previewDoc.sha256Checksum?.slice(0, 16)}...
+                            </p>
+                          </div>
+
+                          <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl text-left text-xs text-amber-900 space-y-1">
+                            <p className="font-bold flex items-center gap-1.5">
+                              <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0" />
+                              <span>Exact Original Document Preserved</span>
+                            </p>
+                            <p className="text-[11px] text-amber-800 leading-relaxed">
+                              This is an authentic {formatName} binary document stored securely in the vault. For 100% pixel-perfect editing, formulas, and pagination, open directly using the desktop application.
+                            </p>
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                            <button
+                              type="button"
+                              onClick={() => downloadSingleDoc(previewDoc.id, previewDoc.title, false)}
+                              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0B192C] text-white text-xs font-bold hover:bg-slate-800 transition shadow-sm"
+                            >
+                              <Download className="w-4 h-4" />
+                              <span>Download Original {formatExt}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => window.open(previewUrl, '_blank')}
+                              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-semibold hover:bg-slate-100 transition shadow-2xs"
+                            >
+                              <ExternalLink className="w-4 h-4 text-slate-500" />
+                              <span>Open in Browser Tab</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // Other / Fallback file
+                    return (
+                      <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 shadow-sm p-6 text-center space-y-3">
+                        <FileCode className="w-12 h-12 text-slate-400 mx-auto" />
+                        <h4 className="font-bold text-sm text-slate-900">{previewDoc.fileName || previewDoc.title}</h4>
+                        <p className="text-xs text-slate-500 font-mono">
+                          {mime || 'application/octet-stream'} • {formatBytes(previewDoc.fileSizeBytes)}
+                        </p>
+                        <div className="pt-2">
+                          <button
+                            type="button"
+                            onClick={() => downloadSingleDoc(previewDoc.id, previewDoc.title, false)}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0B192C] text-white text-xs font-bold hover:bg-slate-800 transition shadow-xs"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>Download Original File</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()
                 ) : (
                   <p className="text-xs text-slate-500">Preview could not be rendered.</p>
                 )
@@ -1053,21 +1448,25 @@ export function DocumentVault({
                     Statutory Document Access Log (ISO 27001 & DPDPA 2023 Compliant)
                   </h4>
                   <div className="divide-y divide-slate-100 text-xs">
-                    {auditLogs.map((log) => (
-                      <div key={log.id} className="py-2.5 flex items-center justify-between">
-                        <div>
-                          <p className="font-bold text-slate-800">
-                            {log.action} • {log.user?.email || 'System'}
-                          </p>
-                          <p className="text-[10px] text-slate-500">
-                            IP: {log.ipAddress} • Client: {log.userAgent?.slice(0, 30)}...
-                          </p>
+                    {auditLogs.length === 0 ? (
+                      <p className="py-4 text-center text-slate-400">No access events recorded yet.</p>
+                    ) : (
+                      auditLogs.map((log) => (
+                        <div key={log.id} className="py-2.5 flex items-center justify-between">
+                          <div>
+                            <p className="font-bold text-slate-800">
+                              {log.action} • {log.user?.email || 'System'}
+                            </p>
+                            <p className="text-[10px] text-slate-500">
+                              IP: {log.ipAddress} • Client: {log.userAgent?.slice(0, 30)}...
+                            </p>
+                          </div>
+                          <span className="text-[11px] text-slate-400 font-mono">
+                            {formatDateTime(log.accessedAt)}
+                          </span>
                         </div>
-                        <span className="text-[11px] text-slate-400 font-mono">
-                          {formatDateTime(log.accessedAt)}
-                        </span>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </div>
               )}

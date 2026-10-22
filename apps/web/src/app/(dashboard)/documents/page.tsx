@@ -79,7 +79,7 @@ export default function GlobalDocumentsExplorerPage() {
       const token = localStorage.getItem('sai_access_token');
       const branchId = localStorage.getItem('sai_active_branch_id');
 
-      const res = await axios.get(`${apiBaseUrl}/documents/${docId}/download?watermark=true`, {
+      const res = await axios.get(`${apiBaseUrl}/documents/${docId}/download`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'X-Branch-Id': branchId || '',
@@ -87,13 +87,20 @@ export default function GlobalDocumentsExplorerPage() {
         responseType: 'blob',
       });
 
-      let filename = `${title}_WATERMARKED.pdf`;
+      let filename = title || 'document';
       const disposition = res.headers ? (res.headers['content-disposition'] || (res.headers as any).get?.('content-disposition')) : null;
       if (disposition && disposition.includes('filename=')) {
-        const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-        if (match && match[1]) {
-          filename = decodeURIComponent(match[1].replace(/['"]/g, ''));
+        const utf8Match = disposition.match(/filename\*=UTF-8''([^;\n]+)/i);
+        const standardMatch = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (utf8Match && utf8Match[1]) {
+          filename = decodeURIComponent(utf8Match[1]);
+        } else if (standardMatch && standardMatch[1]) {
+          filename = decodeURIComponent(standardMatch[1].replace(/['"]/g, ''));
         }
+      } else {
+        const cType = (res.headers ? (res.headers['content-type'] || (res.headers as any).get?.('content-type')) : null) || '';
+        const ext = cType.includes('pdf') ? '.pdf' : cType.includes('png') ? '.png' : cType.includes('jpeg') ? '.jpg' : '';
+        if (ext && !filename.endsWith(ext)) filename += ext;
       }
 
       const contentType = (res.headers ? (res.headers['content-type'] || (res.headers as any).get?.('content-type')) : null) || 'application/octet-stream';
@@ -104,6 +111,7 @@ export default function GlobalDocumentsExplorerPage() {
       document.body.appendChild(link);
       link.click();
       link.remove();
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
     } catch (err: any) {
       alert(`Download failed: ${err.message}`);
     }

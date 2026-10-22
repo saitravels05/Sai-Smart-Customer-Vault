@@ -296,6 +296,28 @@ function cleanDocumentDescription(desc: string | null | undefined): string | nul
   return desc;
 }
 
+function getMimeTypeFromFileName(fileName: string, fallbackMime?: string): string {
+  const lower = (fileName || '').toLowerCase();
+  if (lower.endsWith('.pdf')) return 'application/pdf';
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  if (lower.endsWith('.gif')) return 'image/gif';
+  if (lower.endsWith('.svg')) return 'image/svg+xml';
+  if (lower.endsWith('.bmp')) return 'image/bmp';
+  if (lower.endsWith('.docx')) return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  if (lower.endsWith('.doc')) return 'application/msword';
+  if (lower.endsWith('.xlsx')) return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  if (lower.endsWith('.xls')) return 'application/vnd.ms-excel';
+  if (lower.endsWith('.pptx')) return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+  if (lower.endsWith('.ppt')) return 'application/vnd.ms-powerpoint';
+  if (lower.endsWith('.txt')) return 'text/plain';
+  if (lower.endsWith('.csv')) return 'text/csv';
+  if (lower.endsWith('.json')) return 'application/json';
+  if (lower.endsWith('.zip')) return 'application/zip';
+  return fallbackMime || 'application/octet-stream';
+}
+
 function extractDocumentFile(doc: {
   id: string;
   title: string;
@@ -326,7 +348,8 @@ function extractDocumentFile(doc: {
   if (!buffer) {
     try {
       const storageDir = getVaultStorageDir();
-      const fullPath = nodePath.join(storageDir, doc.storageKey);
+      const safeKey = doc.storageKey.replace(/\.\./g, '');
+      const fullPath = nodePath.join(storageDir, safeKey);
       if (fs.existsSync(fullPath)) {
         buffer = fs.readFileSync(fullPath);
       }
@@ -342,20 +365,12 @@ function extractDocumentFile(doc: {
     : (nodePath.extname(doc.storageKey) || (doc.mimeType === 'image/jpeg' ? '.jpg' : doc.mimeType === 'image/png' ? '.png' : '.pdf'));
 
   const finalFileName = originalFileName || `${(doc.title || 'document').replace(/[^a-zA-Z0-9_-]/g, '_')}${ext}`;
-
-  let resolvedMime = doc.mimeType;
-  if (originalFileName) {
-    const lower = originalFileName.toLowerCase();
-    if (lower.endsWith('.png')) resolvedMime = 'image/png';
-    else if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) resolvedMime = 'image/jpeg';
-    else if (lower.endsWith('.pdf')) resolvedMime = 'application/pdf';
-    else if (lower.endsWith('.webp')) resolvedMime = 'image/webp';
-  }
+  const resolvedMime = getMimeTypeFromFileName(finalFileName, doc.mimeType);
 
   return {
     buffer,
     fileName: finalFileName,
-    mimeType: resolvedMime || 'application/pdf',
+    mimeType: resolvedMime,
   };
 }
 
@@ -1504,7 +1519,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       const category = normalizeDocumentCategory(rawCategory);
       const docType = normalizeDocumentType(rawType);
       const fileName = file ? file.name : (rawFileName || (title ? `${title}.pdf` : 'document.pdf'));
-      const mimeType = file?.type || rawMimeType || (fileName.endsWith('.png') ? 'image/png' : fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') ? 'image/jpeg' : 'application/pdf');
+      const mimeType = file?.type || rawMimeType || getMimeTypeFromFileName(fileName);
 
       let fileBuffer: Buffer;
       if (file) {
@@ -1652,12 +1667,14 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
       const finalFileName = fileName || existingDoc.title;
       const ext = nodePath.extname(finalFileName) || (mimeType === 'image/png' ? '.png' : mimeType === 'image/jpeg' ? '.jpg' : '.pdf');
+      const resolvedMime = getMimeTypeFromFileName(finalFileName, mimeType || existingDoc.mimeType);
       const cleanBase = nodePath.basename(finalFileName, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
       const storageKey = `vault/${existingDoc.customerId}/${Date.now()}_${cleanBase}${ext}`;
 
       try {
         const storageDir = getVaultStorageDir();
-        const fullFilePath = nodePath.join(storageDir, storageKey);
+        const safeKey = storageKey.replace(/\.\./g, '');
+        const fullFilePath = nodePath.join(storageDir, safeKey);
         await fs.promises.mkdir(nodePath.dirname(fullFilePath), { recursive: true });
         await fs.promises.writeFile(fullFilePath, fileBuffer);
       } catch {}
@@ -1668,7 +1685,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         data: {
           storageKey,
           fileSizeBytes,
-          mimeType: mimeType || (ext === '.pdf' ? 'application/pdf' : 'image/jpeg'),
+          mimeType: resolvedMime,
           sha256Checksum,
           description: packDocumentDescription(existingDoc.description || '', finalFileName, fileBuffer),
           currentVersion: nextVersion,
@@ -2786,11 +2803,16 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
         statusCode: 200,
         success: true,
         data: {
-          items: items.map((doc) => ({
-            ...doc,
-            description: cleanDocumentDescription(doc.description),
-            fileSizeBytes: Number(doc.fileSizeBytes),
-          })),
+          items: items.map((doc) => {
+            const { fileName, mimeType } = extractDocumentFile(doc);
+            return {
+              ...doc,
+              fileName,
+              mimeType,
+              description: cleanDocumentDescription(doc.description),
+              fileSizeBytes: Number(doc.fileSizeBytes),
+            };
+          }),
           total,
           page,
           limit,
@@ -2816,10 +2838,15 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
         return NextResponse.json({ success: false, error: { message: 'Document not found.' } }, { status: 404 });
       }
 
+      const authUser = getAuthUser(req);
+      // Branch isolation: staff can only download documents for their branch
+      if (authUser && authUser.role !== 'OWNER' && authUser.branchId && doc.branchId && authUser.branchId !== doc.branchId) {
+        return NextResponse.json({ success: false, error: { message: 'Access denied: document belongs to another branch.' } }, { status: 403 });
+      }
+
       const { buffer, fileName, mimeType } = extractDocumentFile(doc);
 
       // Log access in background
-      const authUser = getAuthUser(req);
       if (authUser?.sub && isValidUuid(authUser.sub)) {
         prisma.documentAccessLog.create({
           data: {
@@ -2838,6 +2865,8 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
           'Content-Type': mimeType,
           'Content-Length': buffer.length.toString(),
           'Content-Disposition': `attachment; filename="${encodeURIComponent(fileName)}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+          'X-Sha256-Checksum': doc.sha256Checksum,
+          'Access-Control-Expose-Headers': 'Content-Disposition, X-Sha256-Checksum, Content-Type, Content-Length',
         },
       });
     }
@@ -2902,11 +2931,14 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
         return NextResponse.json({ success: false, error: { message: 'Document not found' } }, { status: 404 });
       }
 
+      const { fileName, mimeType } = extractDocumentFile(doc);
       return NextResponse.json({
         statusCode: 200,
         success: true,
         data: {
           ...doc,
+          fileName,
+          mimeType,
           description: cleanDocumentDescription(doc.description),
           fileSizeBytes: Number(doc.fileSizeBytes),
           versions: doc.versions.map((v) => ({
